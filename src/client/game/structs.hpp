@@ -817,6 +817,7 @@ namespace game
 		NA_LOOPBACK = 0x2,
 		NA_BROADCAST = 0x3,
 		NA_IP = 0x4,
+		NA_DEMO_SERVER = 0x5,
 	};
 
 	enum netsrc_t

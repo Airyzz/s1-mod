@@ -118,6 +118,7 @@ namespace network
 
 	void send(const game::netadr_s& address, const std::string& command, const std::string& data, const char separator)
 	{
+
 		std::string packet = "\xFF\xFF\xFF\xFF";
 		packet.append(command);
 		packet.push_back(separator);
@@ -129,6 +130,12 @@ namespace network
 	void send_data(const game::netadr_s& address, const std::string& data)
 	{
 		auto size = static_cast<int>(data.size());
+
+		if (address.type == game::NA_DEMO_SERVER) {
+			console::info("Sending data to demo server: %s\n", utils::string::dump_hex(data).data());
+			return;
+		}
+
 		if (address.type == game::NA_LOOPBACK)
 		{
 			// TODO: Fix this for loopback
