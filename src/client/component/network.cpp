@@ -7,9 +7,10 @@
 #include "dvars.hpp"
 #include "network.hpp"
 #include "party.hpp"
-
+#include "demonware.hpp"
 #include <utils/hook.hpp>
 #include <utils/string.hpp>
+#include <utils/hexdump.hpp>
 
 namespace network
 {
@@ -111,14 +112,17 @@ namespace network
 
 	int dw_send_to_stub(const int size, const char* src, game::netadr_s* a3)
 	{
+		std::string data = std::string(src, size);
+		std::string dump = utils::hexdump::dump_hex(data);
+
 		sockaddr s = {};
 		game::NetadrToSockadr(a3, &s);
-		return sendto(*game::query_socket, src, size, 0, &s, 16) >= 0;
+
+		return demonware::io::sendto_stub(*game::query_socket, src, size, 0, &s, 16) >= 0;
 	}
 
 	void send(const game::netadr_s& address, const std::string& command, const std::string& data, const char separator)
 	{
-
 		std::string packet = "\xFF\xFF\xFF\xFF";
 		packet.append(command);
 		packet.push_back(separator);
@@ -131,10 +135,7 @@ namespace network
 	{
 		auto size = static_cast<int>(data.size());
 
-		if (address.type == game::NA_DEMO_SERVER) {
-			console::info("Sending data to demo server: %s\n", utils::string::dump_hex(data).data());
-			return;
-		}
+		std::string dump = utils::hexdump::dump_hex(data);
 
 		if (address.type == game::NA_LOOPBACK)
 		{

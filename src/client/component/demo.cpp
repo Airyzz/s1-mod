@@ -8,12 +8,10 @@
 
 #include <utils/hook.hpp>
 #include <utils/string.hpp>
+#include <utils/hexdump.hpp>
 
 #include "scheduler.hpp"
 #include "scripting.hpp"
-
-
-
 namespace demo
 {
 
@@ -29,18 +27,24 @@ namespace demo
 
 	std::map<int, game::msg_t> storedSnapshots;
 
-
 	std::map<int, std::list<client_msg>> storedClientSnapshots;
+
+	utils::hook::detour net_send_loop_hook;
+	utils::hook::detour sys_send_packet_hook;
+
+	utils::hook::detour sys_get_packet_hook;
+	utils::hook::detour net_get_loop_packet_hook;
 
 	void sv_send_message_to_client_stub(game::msg_t* msg, game::mp::client_t* client) {
 
 		int time = *game::mp::gameTime;
+
 		
 		if (demo_playback->current.enabled) {
 			if (storedSnapshots.find(time) != storedSnapshots.end()) {
 				auto snapshot = storedSnapshots[time];
-
-				console::info("Demo Recorder: Playing back stored snapshot (%d) %s\n", time, utils::string::dump_hex(std::string(snapshot.data, snapshot.cursize)).data());
+				auto dump = utils::hexdump::dump_hex(std::string(snapshot.data, snapshot.cursize)).data();
+				console::info("Demo Recorder: Playing back stored snapshot (%d) %s\n", time, dump);
 				utils::hook::invoke<void>(0x140451040, snapshot, client);
 				return;
 			}
@@ -49,7 +53,8 @@ namespace demo
 			}
 
 		} else if (demo_recording->current.enabled) {
-			console::info("Demo Recorder: [%d] Sending snapshot to client %s\n", time,  utils::string::dump_hex(std::string(msg->data, msg->cursize)).data());
+			auto dump = utils::hexdump::dump_hex(std::string(msg->data, msg->cursize)).data();
+			console::info("Demo Recorder: [%d] Sending snapshot to client %s\n", time, dump);
 			game::msg_t copy = *msg;
 			
 			copy.data = (char *) alloca(msg->cursize);
@@ -98,19 +103,40 @@ namespace demo
 		return utils::hook::invoke<int64_t>(0x140210A70, chan, data, len);
 	}
 
+	int sys_get_packet_stub(game::netadr_s* from, game::msg_t* message) {
+		int result = sys_get_packet_hook.invoke<int>(from, message);
+		
+		if (result != 0) {
+			std::string data = std::string(message->data, message->cursize);
+			std::string dump = utils::hexdump::dump_hex(data);
+			console::info("Sys_GetPacket !![%d]!!: (%d, %d, %d) %s\n", message->targetLocalNetID, from->type, from->localNetID, from->addrHandleIndex,  dump.data());
+		}
+		else {
+			//console::info("Sys_GetPacket Attempted: (%d, %d, %d)\n", from->type, from->localNetID, from->addrHandleIndex);
+		}
+		
+		return result;
+	}
 
-	int sys_string_to_adr_stub(const char* s, game::netadr_s* a) {
-		console::info("SYS_StringToAdr called: %s\n", s);
-		if (strcmp(s, "demo.server") == 0) {
-			memcpy(a->ip, "demo", 4);
-			a->port = 1337;
-			a->type = game::NA_DEMO_SERVER;
+	int net_get_loop_packet_stub(game::netsrc_t sock, game::netadr_s* from, game::msg_t* message) {
 
-			console::info("Returning demo server ip\n");
-			return 1;
+		int result = net_get_loop_packet_hook.invoke<int>(sock, from, message);
+
+		if (result != 0) {
+			/*
+			std::string data = std::string(message->data, message->cursize);
+			std::string dump = utils::hexdump::dump_hex(data);
+			console::info("(Net_GetLoop) sock: %d, type: %d, id: %d\n", sock, from->type, from->localNetID);
+			if (sock == game::NS_SERVER) {
+				console::info("(Net_GetLoop) server <- client %s\n", dump.data());
+			}
+			else if (sock == game::NS_CLIENT1) {
+				console::info("(Net_GetLoop) client <- server %s\n", dump.data());
+			}
+			*/
 		}
 
-		return utils::hook::invoke<int>(0x1404B7110, s, a);
+		return result;
 	}
 	
 	class component final : public component_interface
@@ -120,10 +146,14 @@ namespace demo
 		{
 
 			utils::hook::call(0x1404513CF, sv_send_message_to_client_stub); // SV_SendSnapshots
-		//	utils::hook::call(0x140205D63, cl_netchan_transmit_sub); // CL_WritePacket
+			utils::hook::call(0x140205D63, cl_netchan_transmit_sub); // CL_WritePacket
 
-			utils::hook::call(0x1403DB0E6, sys_string_to_adr_stub); //Net_StringToIP4
+			sys_get_packet_hook.create(0x1404D8280, &sys_get_packet_stub);
+			net_get_loop_packet_hook.create(0x1403DABC0, &net_get_loop_packet_stub);
+
+
 			console::info("Demo component registered!");
+
 
 			
 			demo_recording = game::Dvar_RegisterBool("demo_recording", false, game::DVAR_FLAG_NONE, "True if a demo is currently being recorded");
@@ -146,6 +176,21 @@ namespace demo
 				console::info("==== DEMO RECORDING SHUTDOWN ====\n");
 				//game::Dvar_SetBool(demo_recording, false);
 			});
+
+
+			scheduler::on_game_initialized([]
+			{
+
+				console::info("==================================\n");
+				console::info("DEMO RECORDING STARTED!\n");
+				console::info("DEMO RECORDING STARTED!\n");
+				console::info("DEMO RECORDING STARTED!\n");
+				console::info("DEMO RECORDING STARTED!\n");
+				console::info("DEMO RECORDING STARTED!\n");
+				console::info("==================================\n");
+
+
+			}, scheduler::pipeline::main);
 
 
 		}
