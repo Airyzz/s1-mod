@@ -23,6 +23,7 @@ namespace game
 	WEAK symbol<CodPlayMode()> Com_GetCurrentCoDPlayMode{0, 0x1404C9690};
 	WEAK symbol<void(float, float, int)> Com_SetSlowMotion{0, 0x1403D19B0};
 	WEAK symbol<void()> Com_Quit_f{0x1402F9390, 0x1403D08C0};
+	WEAK symbol<int(int msec)> Com_TimeScaleMsec(0x0, 0x1403D1E20);
 
 	WEAK symbol<void(const char* cmdName, void (), cmd_function_s* allocedCmd)> Cmd_AddCommandInternal{0x1402EDDB0, 0x1403AF2C0};
 	WEAK symbol<void(int localClientNum, int controllerIndex, const char* text)> Cmd_ExecuteSingleCommand{0x1402EE350, 0x1403AF900};

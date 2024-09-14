@@ -372,7 +372,7 @@ namespace demonware
 		udp_servers.create<stun_server>("stun.eu.demonware.net");
 		udp_servers.create<stun_server>("stun.jp.demonware.net");
 		udp_servers.create<stun_server>("stun.au.demonware.net");
-		udp_servers.create<theater_server>("demo");
+		udp_servers.create<theater::theater_server>("demo");
 
 		tcp_servers.create<auth3_server>("aw-pc-auth3.prod.demonware.net");
 		tcp_servers.create<lobby_server>("aw-pc-lobby.prod.demonware.net");

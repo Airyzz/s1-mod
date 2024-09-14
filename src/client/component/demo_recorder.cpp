@@ -18,7 +18,6 @@
 #include "scripting.hpp"
 namespace demo
 {
-
 	std::string get_dvar_string(const std::string& dvar)
 	{
 		const auto* dvar_value = game::Dvar_FindVar(dvar.data());
@@ -30,14 +29,13 @@ namespace demo
 		return {};
 	}
 
-
 	class DemoRecorder {
 
 	private:
 		std::ofstream stream;
 
 	public: 
-		void writeMessage(int time, game::msg_t* data) {
+		void write_message(int time, game::msg_t* data) {
 			demonware::byte_buffer buffer;
 			buffer.set_use_data_types(false);
 
@@ -57,8 +55,9 @@ namespace demo
 		void init() {
 			utils::io::create_directory("demos");
 
-			auto map = get_dvar_string("ui_mapname");
+			auto map = get_dvar_string("mapname");
 			auto type = get_dvar_string("g_gametype");
+			int start_time = *game::mp::clientTime;
 
 			auto now = std::chrono::system_clock::now();
 			std::time_t time = std::chrono::system_clock::to_time_t(now);
@@ -77,15 +76,22 @@ namespace demo
 
 			stream = std::ofstream(
 				path, std::ios::binary | std::ofstream::out);
+
+			demonware::byte_buffer buffer;
+			buffer.set_use_data_types(false);
+
+			buffer.write_blob(map);
+			buffer.write_blob(type);
+
+			auto d = buffer.get_buffer();
+			stream.write(d.data(), static_cast<std::streamsize>(d.size()));
+			stream.flush();
 		}
 
 		void close() {
 			stream.close();
 		}
 	};
-
-
-	std::string current_recording;
 
 
 	utils::hook::detour cl_parseservermessage_hook;
@@ -108,66 +114,49 @@ namespace demo
 
 	void begin_recording() {
 		console::info("----- Beginning Demo Recording! ------\n");
-		console::info("----- Map Name: %s ------\n", get_dvar_string("ui_mapname").data());
+		console::info("----- Map Name: %s ------\n", get_dvar_string("mapname").data());
 		console::info("----- Game Type: %s ------\n", get_dvar_string("g_gametype").data());
 		recorder = DemoRecorder();
 		recorder->init();
 	}
 
 	void cl_parseservermessage_stub(int localClientNum, game::msg_t* message) {
-
-		auto copy = *message;
-		copy.data = reinterpret_cast<char*>(malloc(copy.cursize));
-		memcpy(copy.data, message->data, message->cursize);
-
-		std::string data = std::string(copy.data, copy.cursize);
-
-		console::info("\tCL_ParseServerMessage (pre): [cursize: %d  - readcount: %d  -  overflowed: %d]\n", message->cursize, message->readcount, message->overflowed);
-		console::info("tCL_ParseServerMessage: [cursize %d  -  serverTime: %d   gameTime: %d   clientTime: %d]  CURRENT STATUS: %d\n", copy.cursize, *game::mp::serverTime, *game::mp::gameTime, *game::mp::clientTime, *game::connectionStatus);
-		//utils::hexdump::dump_hex_to_stdout(std::string(copy.data, copy.cursize));
-
-		console::info("=== BEGIN PARSE SERVER MESSAGE INVOKE ===\n");
 		cl_parseservermessage_hook.invoke<void>(localClientNum, message);
-		console::info("=== END PARSE SERVER MESSAGE INVOKE ===\n");
 
 		if (message->overflowed) {
-			console::info("Message overflowed! CL_ParseServerMessage: [cursize: %d  - readcount: %d]\n", message->cursize, message->readcount);
 			return;
 		}
 
 		if (recorder) {
-			console::info("Recorded CL_ServerMessage for serverTime: %d  gameTime: %d   clientTime: %d\n", *game::mp::serverTime, *game::mp::gameTime, *game::mp::clientTime);
-			recorder->writeMessage(*game::mp::serverTime, &copy);
+			recorder->write_message(*game::mp::clientTime, message);
 		};
-
 	}
 
 	void* cl_connectionlesspacket_stub(int localClientNum, game::netsrc_t* from, game::msg_t* message, int64_t a4) {
-		auto copy = *message;
-		copy.data = reinterpret_cast<char*>(malloc(copy.cursize));
-		memcpy(copy.data, message->data, message->cursize);
 
-		std::string data = std::string(copy.data, copy.cursize);
+
+		std::string data = std::string(message->data, message->cursize);
+
+
+		auto result = cl_connectionlesspacket_hook.invoke<void*>(localClientNum, from, message, a4);
 
 		if (data.starts_with("\xff\xff\xff\xff\connectResponse")) {
-			begin_recording();
+			if (!game::VirtualLobby_Loaded()) {
+				begin_recording();
+			}
 		}
 
-		console::info("\CL_ConnectionlessPacket (pre): [cursize: %d  - readcount: %d  -  overflowed: %d]\n", message->cursize, message->readcount, message->overflowed);
-		console::info("CL_ConnectionlessPacket: [cursize %d  -  serverTime: %d   gameTime: %d   clientTime: %d]  CURRENT STATUS: %d\n", copy.cursize, *game::mp::serverTime, *game::mp::gameTime, *game::mp::clientTime, *game::connectionStatus);
-		//utils::hexdump::dump_hex_to_stdout(std::string(copy.data, copy.cursize));
-
-		console::info("=== BEGIN CONNECTIONLESS PACKET INVOKE ===\n");
-		auto result = cl_connectionlesspacket_hook.invoke<void*>(localClientNum, from, message, a4);
-		console::info("=== END CONNECTIONLESS PACKET INVOKE ===\n");
 		if (message->overflowed) {
-			console::info("Message overflowed! CL_ConnectionlessPacket: [cursize: %d  - readcount: %d]\n", message->cursize, message->readcount);
+			return result;
+		}
+
+		// we dont need to record this
+		if (data.starts_with("\xff\xff\xff\xff\syncDataResponse")) {
 			return result;
 		}
 
 		if (recorder) {
-			console::info("Recorded CL_ConnectionlessPacket for serverTime: %d  gameTime: %d   clientTime: %d\n", *game::mp::serverTime, *game::mp::gameTime, *game::mp::clientTime);
-			recorder->writeMessage(*game::mp::serverTime, &copy);
+			recorder->write_message(*game::mp::clientTime, message);
 		};
 
 		return result;
