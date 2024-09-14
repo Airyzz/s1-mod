@@ -87,126 +87,14 @@ namespace demo
 
 	std::string current_recording;
 
-	utils::hook::detour cl_packetevent_hook;
+
 	utils::hook::detour cl_parseservermessage_hook;
 	utils::hook::detour cl_connectionlesspacket_hook;
-
-	utils::hook::detour cl_parsemessage_hook;
-
-	utils::hook::detour msg_read_delta_playerstate_hook;
-	utils::hook::detour cg_processentity_hook;
-
-	utils::hook::detour cl_parse_packet_unk1_hook;
-	utils::hook::detour cl_parse_packet_unk2_hook;
-
-	utils::hook::detour msg_read_delta_client_hook;
-
-	utils::hook::detour msg_read_delta_struct_hook;
-
 	utils::hook::detour cg_draw_active_frame_hook;
-
-	utils::hook::detour msg_readlong_hook;
-	utils::hook::detour msg_readbyte_hook;
-	utils::hook::detour msg_discard_hook;
-
-	utils::hook::detour memfile_readcompresseddata_hook;
-	utils::hook::detour msg_readbitscompress_hook;
 
 	std::optional<DemoRecorder> recorder;
 
 	game::dvar_t demo_rendering;
-
-	void cl_parse_packet_unk1_stub(void* cl, game::msg_t* msg, int time, unsigned int* oldFrame, unsigned int* newFrame) {
-		char buf[0x5160];
-		memcpy(buf, newFrame, 0x5160);
-
-		cl_parse_packet_unk1_hook.invoke<void>(cl, msg, time, oldFrame, newFrame);
-
-		memcpy(newFrame, buf, 0x5160);
-	}
-
-	void cl_parse_packet_unk2_stub(void* cl, game::msg_t* msg, int time, unsigned int* oldFrame, unsigned int* newFrame) {
-		char buf[0x5160];
-		memcpy(buf, newFrame, 0x5160);
-
-		cl_parse_packet_unk2_hook.invoke<void>(cl, msg, time, oldFrame, newFrame);
-
-		memcpy(newFrame, buf, 0x5160);
-
-		//newFrame[5192] = time;
-	}
-
-	int64_t msg_readdeltaclient_stub(game::msg_t* msg, int time, void* fromState, void* toState, int number) {
-		console::info("[%d] Reading delta client for number: [%d]!\n", time, number);
-		return msg_read_delta_client_hook.invoke<int64_t>(msg, time, fromState, toState, number);
-	}
-
-	int64_t msg_read_delta_struct_stub(game::msg_t* msg, int time, void* from, void* to, int number, int numFields, int indexBits, void* stateFields, void* skippedFieldbits) {
-		console::info("\tReading delta struct for number: [%d] num fields: (%d)!\n", time, number, numFields);
-		return msg_read_delta_struct_hook.invoke<int64_t>(msg, time, from, to, number, numFields, indexBits, stateFields, skippedFieldbits);
-	}
-
-	int64_t msg_readlong_stub(game::msg_t* msg) {
-		auto result = msg_readlong_hook.invoke<int64_t>(msg);
-		console::info("read_long: %llx\n", result);
-
-		return result;
-	}
-
-	uint8_t msg_readbyte_stub(game::msg_t* msg) {
-		auto result = msg_readbyte_hook.invoke<uint8_t>(msg);
-		console::info("read_byte: %x\n", result);
-		return result;
-	}
-
-	int64_t memfile_readcompresseddata_stub(void* src, int num_bytes, void* dst, int dst_size_maybe) {
-
-
-		console::info("MemFile_ReadCompressedData: %llx   %llx   %llx    %llx\n", src, num_bytes, dst, dst_size_maybe);
-
-		auto result = memfile_readcompresseddata_hook.invoke<int64_t>(src, num_bytes, dst, dst_size_maybe);
-
-		console::info("MemFile_ReadCompressedData returned: %llx\n", result);
-
-		auto compressed_data = std::string(reinterpret_cast<char*>(src), num_bytes);
-		auto decompressed_data = std::string(reinterpret_cast<char*>(dst), result);
-
-		console::info("MemFile_ReadCompressedData compressed data: \n");
-		utils::hexdump::dump_hex_to_stdout(compressed_data);
-
-		console::info("THERE SHOULD HAVE BEEN DATA RIGHT ABOVE HERE!\n");
-		console::info("MemFile_ReadCompressedData decompressed data:\n");
-		utils::hexdump::dump_hex_to_stdout(decompressed_data);
-
-
-		return result;
-	}
-
-	int64_t MSG_ReadBitsCompress_stub(void* from, void* to, int size, int64_t dst_size, int* out_size) {
-
-		console::info("MSG_ReadBitsCompress: %llx   %llx   %x   %llx    %llx\n", from, to, size, dst_size, out_size);
-		auto result = msg_readbitscompress_hook.invoke<int64_t>(from, to, size, dst_size, out_size);
-
-		console::info("MSG_ReadBitsCompress returned: %llx   (%d bytes)\n", result, *out_size);
-
-		auto compressed_data = std::string(reinterpret_cast<char*>(from), size);
-		auto decompressed_data = std::string(reinterpret_cast<char*>(to), *out_size);
-
-		//console::info("MSG_ReadBitsCompress compressed data:\n");
-		//utils::hexdump::dump_hex_to_stdout(compressed_data);
-
-
-		//console::info("MSG_ReadBitsCompress decompressed data:\n");
-		//utils::hexdump::dump_hex_to_stdout(decompressed_data);
-
-		return result;
-	}
-
-	void* msg_discard_stub(void* a1) {
-		auto result = msg_discard_hook.invoke<void*>(a1);
-		console::info("MSG_Discard(%llx) called -> %llx\n", a1, result);
-		return result;
-	}
 
 	int cg_drawactiveframe_stub(int localClientNum, int serverTime, int demoType, void* cubemapShot, void* cubemapSize, void* renderScreen, void* idk) {
 		auto var = game::Dvar_FindVar("demo_rendering");
@@ -219,24 +107,11 @@ namespace demo
 
 
 	void begin_recording() {
-
 		console::info("----- Beginning Demo Recording! ------\n");
 		console::info("----- Map Name: %s ------\n", get_dvar_string("ui_mapname").data());
 		console::info("----- Game Type: %s ------\n", get_dvar_string("g_gametype").data());
 		recorder = DemoRecorder();
 		recorder->init();
-
-	}
-
-	int cl_packetevent_stub(int localClientNum, game::netadr_s* from, game::msg_t* message, int time) {
-
-		int result = cl_packetevent_hook.invoke<int>(localClientNum, from, message, time);
-
-		console::info("\CL_PacketEvent  received msg of [cursize: %d ]\n", message->cursize);
-
-
-
-		return result;
 	}
 
 	void cl_parseservermessage_stub(int localClientNum, game::msg_t* message) {
@@ -298,66 +173,16 @@ namespace demo
 		return result;
 	}
 
-	void cl_parsemessage_stub(int localClientNum, void* idk, game::msg_t* message) {
-		console::info("\t\tCL_ParseMessage (pre): [cursize: %d  - readcount: %d  -  overflowed: %d]\n", message->cursize, message->readcount, message->overflowed);
-		cl_parsemessage_hook.invoke<void>(localClientNum, idk, message);
-		console::info("\t\tCL_ParseMessage (post): [cursize: %d  - readcount: %d  -  overflowed: %d]\n", message->cursize, message->readcount, message->overflowed);
-	}
-
-	void msg_read_delta_playerstate_stub(int localClientNum, game::msg_t* msg, int time, game::playerState_s* from, game::playerState_s* to, bool predictedFieldsIgnoreXor) {
-		msg_read_delta_playerstate_hook.invoke<void>(localClientNum, msg, time, from, to, predictedFieldsIgnoreXor);
-
-		console::info("MSG_ReadDeltaPlayerState: %d, %llx, %d, %llx, %llx, %d\n", localClientNum, msg, time, from, to, predictedFieldsIgnoreXor);
-	}
-
-	uint8_t msg_readfirstbyte_stub(game::msg_t* msg) {
-		auto result = game::MSG_ReadByte(msg);
-		console::info("CL_ParseMessage: got first byte %d\n", result);
-
-		if (result == 0) {
-			console::info("CL_ParseMessage: FIRST BYTE WAS ZERO!! MESSAGE: %d\n", result);
-			std::string data = std::string(msg->data, msg->cursize);
-
-			console::info("CL_ParseMessage: [cursize %d  - readcount  %d]  CURRENT STATUS: %d    %s\n", msg->cursize, msg->readcount, *game::connectionStatus, utils::string::dump_hex(std::string(msg->data, msg->cursize)).data());
-		}
-
-		return result;
-	};
-
 	class component final : public component_interface
 	{
 	public:
 		void post_unpack() override
 		{
-			cl_packetevent_hook.create(0x14020D720, &cl_packetevent_stub);
-			
-			//utils::hook::call(0x1402117E3, msg_readfirstbyte_stub);
-			//memfile_readcompresseddata_hook.create(0x01404C5F80, &memfile_readcompresseddata_stub);
-			//msg_readbitscompress_hook.create(0x01403D47E0, &MSG_ReadBitsCompress_stub);
-			
 			cl_parseservermessage_hook.create(0x1402129B0, &cl_parseservermessage_stub);
 			cl_connectionlesspacket_hook.create(0x01402096E0, &cl_connectionlesspacket_stub);
-			
-			//cl_parsemessage_hook.create(0x1402117A0, &cl_parsemessage_stub);
-			//msg_discard_hook.create(0x1403D4380, &msg_discard_stub);
-
-			// msg_read_delta_playerstate_hook.create(0x1403D76F0, &msg_read_delta_playerstate_stub);
-			//cl_parse_packet_unk1_hook.create(0x140211DE0, &cl_parse_packet_unk1_stub);
-			//cl_parse_packet_unk2_hook.create(0x140211940, &cl_parse_packet_unk2_stub);
-			//msg_read_delta_client_hook.create(0x1403D6030, &msg_readdeltaclient_stub);
-			//msg_read_delta_struct_hook.create(0x1403D6C10, &msg_read_delta_struct_stub);
-			
 			cg_draw_active_frame_hook.create(0x1401D4710, &cg_drawactiveframe_stub);
 
 			game::Dvar_RegisterInt("demo_rendering", 0, 0, 10, game::DVAR_FLAG_NONE, "is rendering in demo mode");
-
-			command::add("dump_info", [&]()
-			{
-				console::info("cg_draw2d: %llx\n", game::Dvar_FindVar("cg_draw2d"));
-
-				msg_readbyte_hook.create(0x1403D4890, &msg_readbyte_stub);
-				msg_readlong_hook.create(0x1403D4B70, &msg_readlong_stub);
-			});
 
 			scripting::on_shutdown([](int free_scripts)
 			{
@@ -365,7 +190,6 @@ namespace demo
 				if (recorder) {
 					recorder->close();
 				}
-				//game::Dvar_SetBool(demo_recording, false);
 			});
 		}
 	};

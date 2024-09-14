@@ -11,7 +11,7 @@
 #include "game/demonware/servers/umbrella_server.hpp"
 #include "game/demonware/server_registry.hpp"
 #include "game/demonware/servers/theater_server.hpp"
-#include "../component/console.hpp"
+
 #define TCP_BLOCKING true
 #define UDP_BLOCKING false
 
@@ -372,7 +372,7 @@ namespace demonware
 		udp_servers.create<stun_server>("stun.eu.demonware.net");
 		udp_servers.create<stun_server>("stun.jp.demonware.net");
 		udp_servers.create<stun_server>("stun.au.demonware.net");
-		udp_servers.create<theater_server>("demo.s1");
+		udp_servers.create<theater_server>("demo");
 
 		tcp_servers.create<auth3_server>("aw-pc-auth3.prod.demonware.net");
 		tcp_servers.create<lobby_server>("aw-pc-lobby.prod.demonware.net");

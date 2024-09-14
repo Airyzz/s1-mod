@@ -228,15 +228,6 @@ namespace game
 	WEAK symbol<void*(jmp_buf* Buf, int Value)> longjmp{0x14059C5C0, 0x1406FD930};
 	WEAK symbol<int(jmp_buf* Buf)> _setjmp{0x14059CD00, 0x1406FE070};
 
-	WEAK symbol<void(msg_t* msg)> MSG_BeginReading(0, 0x1403D4370);
-	WEAK symbol<int(msg_t* msg)> MSG_ReadLong(0, 0x01403D4B70);
-	WEAK symbol<uint8_t(msg_t* msg)> MSG_ReadByte(0, 0x1403D4890);
-
-	WEAK symbol <const char* (msg_t* msg, char* string, int maxChars)> MSG_ReadStringLine(0, 0x01403D4D50);
-	WEAK symbol <void(msg_t* buf, char* data, int length)> MSG_Init(0, 0x01403D4430);
-	WEAK symbol <void(msg_t* msg, int c)> MSG_WriteLong(0, 0x1403D5480);
-	WEAK symbol <void(msg_t* msg, const char* s)> MSG_WriteString(0, 0x1403D54E0);
-
 	/***************************************************************
 	 * Variables
 	 **************************************************************/

@@ -7,8 +7,6 @@
 #include "game_console.hpp"
 #include "rcon.hpp"
 #include "scheduler.hpp"
-#include <stdio.h>
-#include <windows.h>
 
 #include <utils/concurrency.hpp>
 #include <utils/hook.hpp>
@@ -21,9 +19,8 @@ namespace console
 		using message_queue = std::queue<std::string>;
 		utils::concurrency::container<message_queue> message_queue_;
 
-		std::atomic_bool started_{false};
-		std::atomic_bool terminate_runner_{false};
-		std::mutex lock;
+		std::atomic_bool started_{ false };
+		std::atomic_bool terminate_runner_{ false };
 
 		void print_message(const char* message)
 		{
@@ -48,27 +45,28 @@ namespace console
 			const auto count = vsnprintf_s(buffer, _TRUNCATE, message, *ap);
 
 			if (count < 0) return {};
-			return {buffer, static_cast<size_t>(count)};
+			return { buffer, static_cast<size_t>(count) };
 		}
 
 		void dispatch_message(const int type, const std::string& message)
 		{
+			if (rcon::message_redirect(message))
+			{
+				return;
+			}
 
-			lock.lock();
-			auto id = std::hash<std::thread::id>{}(std::this_thread::get_id());
-			auto msg = std::format("{}] {}", id % 0xffff, message.c_str());
+			game_console::print(type, message);
 
-			//auto color = id % 0b0111;
-			//if (color == 0) {
-			//	color = 0b0111;
-			//}
-			//SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+			if (game::is_headless())
+			{
+				std::fputs(message.data(), stdout);
+				return;
+			}
 
-			game_console::print(type, msg);
-			std::fputs(msg.data(), stdout);
-
-			lock.unlock();
-			
+			message_queue_.access([&message](message_queue& queue)
+			{
+				queue.emplace(message);
+			});
 		}
 
 		message_queue empty_message_queue()

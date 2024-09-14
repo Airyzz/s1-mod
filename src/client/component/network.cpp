@@ -8,9 +8,9 @@
 #include "network.hpp"
 #include "party.hpp"
 #include "demonware.hpp"
+
 #include <utils/hook.hpp>
 #include <utils/string.hpp>
-#include <utils/hexdump.hpp>
 
 namespace network
 {
@@ -112,9 +112,6 @@ namespace network
 
 	int dw_send_to_stub(const int size, const char* src, game::netadr_s* a3)
 	{
-		std::string data = std::string(src, size);
-		std::string dump = utils::hexdump::dump_hex(data);
-
 		sockaddr s = {};
 		game::NetadrToSockadr(a3, &s);
 
@@ -134,9 +131,6 @@ namespace network
 	void send_data(const game::netadr_s& address, const std::string& data)
 	{
 		auto size = static_cast<int>(data.size());
-
-		std::string dump = utils::hexdump::dump_hex(data);
-
 		if (address.type == game::NA_LOOPBACK)
 		{
 			// TODO: Fix this for loopback
@@ -185,7 +179,7 @@ namespace network
 	}
 
 	game::dvar_t* register_netport_stub(const char* dvarName, int value, int min, int max, unsigned int flags,
-	                                    const char* description)
+		const char* description)
 	{
 		auto dvar = game::Dvar_RegisterInt("net_port", 27016, 0, 0xFFFFu, game::DVAR_FLAG_LATCHED, "Network port");
 
