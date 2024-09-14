@@ -111,6 +111,7 @@ namespace game
 	WEAK symbol<void(playerState_s* ps, unsigned int weapon, int hadWeapon)> G_InitializeAmmo{0x1402217F0, 0x1402F22B0};
 	WEAK symbol<void(int clientNum, unsigned int weapon)> G_SelectWeapon{0x140275380, 0x140340D50};
 	WEAK symbol<int(playerState_s* ps, unsigned int weapon)> G_TakePlayerWeapon{0x1402754E0, 0x1403411D0};
+	WEAK symbol<int64_t(int clientNum)> G_GetClientArchiveServerTime{ 0, 0x1402F6A50 };
 
 	WEAK symbol<char*(char* string)> I_CleanStr{0x140379010, 0x1404C99A0};
 
@@ -229,6 +230,8 @@ namespace game
 
 	WEAK symbol<void(msg_t* msg)> MSG_BeginReading(0, 0x1403D4370);
 	WEAK symbol<int(msg_t* msg)> MSG_ReadLong(0, 0x01403D4B70);
+	WEAK symbol<uint8_t(msg_t* msg)> MSG_ReadByte(0, 0x1403D4890);
+
 	WEAK symbol <const char* (msg_t* msg, char* string, int maxChars)> MSG_ReadStringLine(0, 0x01403D4D50);
 	WEAK symbol <void(msg_t* buf, char* data, int length)> MSG_Init(0, 0x01403D4430);
 	WEAK symbol <void(msg_t* msg, int c)> MSG_WriteLong(0, 0x1403D5480);
@@ -275,6 +278,10 @@ namespace game
 
 	WEAK symbol<unsigned int> tls_index{0x14F65DAF0, 0x150085C44};
 
+	WEAK symbol<int> com_frameTime{ 0, 0x147B74C58 };
+
+	WEAK symbol<int> connectionStatus{ 0, 0x1417E1690 };
+
 	namespace mp
 	{
 		WEAK symbol<gentity_s> g_entities{0, 0x144758C70};
@@ -283,6 +290,7 @@ namespace game
 
 		WEAK symbol<int> gameTime{0, 0x144959C2C};
 		WEAK symbol<int> serverTime{0, 0x1496C4B00};
+		WEAK symbol<int> clientTime{ 0, 0x141620510 };
 
 		WEAK symbol<int> ping{0, 0x1417E6A84};
 

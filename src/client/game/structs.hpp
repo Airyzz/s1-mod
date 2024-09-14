@@ -854,6 +854,7 @@ namespace game
 		int useZlib;
 	};
 
+
 	enum errorParm
 	{
 		ERR_FATAL = 0,

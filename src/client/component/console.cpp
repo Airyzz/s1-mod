@@ -7,6 +7,8 @@
 #include "game_console.hpp"
 #include "rcon.hpp"
 #include "scheduler.hpp"
+#include <stdio.h>
+#include <windows.h>
 
 #include <utils/concurrency.hpp>
 #include <utils/hook.hpp>
@@ -21,6 +23,7 @@ namespace console
 
 		std::atomic_bool started_{false};
 		std::atomic_bool terminate_runner_{false};
+		std::mutex lock;
 
 		void print_message(const char* message)
 		{
@@ -50,23 +53,22 @@ namespace console
 
 		void dispatch_message(const int type, const std::string& message)
 		{
-			if (rcon::message_redirect(message))
-			{
-				return;
-			}
 
-			game_console::print(type, message);
+			lock.lock();
+			auto id = std::hash<std::thread::id>{}(std::this_thread::get_id());
+			auto msg = std::format("{}] {}", id % 0xffff, message.c_str());
 
-			if (game::is_headless())
-			{
-				std::fputs(message.data(), stdout);
-				return;
-			}
+			//auto color = id % 0b0111;
+			//if (color == 0) {
+			//	color = 0b0111;
+			//}
+			//SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
 
-			message_queue_.access([&message](message_queue& queue)
-			{
-				queue.emplace(message);
-			});
+			game_console::print(type, msg);
+			std::fputs(msg.data(), stdout);
+
+			lock.unlock();
+			
 		}
 
 		message_queue empty_message_queue()

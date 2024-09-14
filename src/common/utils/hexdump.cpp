@@ -1,5 +1,5 @@
 #include "hexdump.hpp"
-
+#include <mutex>
 #include <iostream>
 #include <vector>
 #include <iomanip>
@@ -72,7 +72,14 @@ namespace utils::hexdump
 	{
         std::stringstream ss;
         hex_dump(ss, reinterpret_cast<const uint8_t*>(data.data()), data.length(), true);
-
         return ss.str();
 	}
+
+    std::mutex m;
+
+    void dump_hex_to_stdout(const std::string& data) {
+        m.lock();
+        hex_dump(std::cout, reinterpret_cast<const uint8_t*>(data.data()), data.length(), true);
+        m.unlock();
+    }
 }

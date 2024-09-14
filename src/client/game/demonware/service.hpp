@@ -52,14 +52,14 @@ namespace demonware
 			if (it != this->tasks_.end())
 			{
 #ifdef DEBUG
-				printf("[DW] %s: executing task '%d'\n", name_.data(), this->task_id_);
+				//printf("[DW] %s: executing task '%d'\n", name_.data(), this->task_id_);
 #endif
 
 				it->second(server, &buffer);
 			}
 			else
 			{
-				printf("[DW] %s: missing task '%d'\n", name_.data(), this->task_id_);
+				// printf("[DW] %s: missing task '%d'\n", name_.data(), this->task_id_);
 
 				// return no error
 				server->create_reply(this->task_id_)->send();
