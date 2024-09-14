@@ -19,8 +19,8 @@ namespace console
 		using message_queue = std::queue<std::string>;
 		utils::concurrency::container<message_queue> message_queue_;
 
-		std::atomic_bool started_{ false };
-		std::atomic_bool terminate_runner_{ false };
+		std::atomic_bool started_{false};
+		std::atomic_bool terminate_runner_{false};
 
 		void print_message(const char* message)
 		{
@@ -45,7 +45,7 @@ namespace console
 			const auto count = vsnprintf_s(buffer, _TRUNCATE, message, *ap);
 
 			if (count < 0) return {};
-			return { buffer, static_cast<size_t>(count) };
+			return {buffer, static_cast<size_t>(count)};
 		}
 
 		void dispatch_message(const int type, const std::string& message)
