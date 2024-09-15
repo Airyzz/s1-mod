@@ -13,6 +13,7 @@ namespace demonware
 		using udp_server::udp_server;
 		void set_demo_file(std::string filepath);
 		void stop();
+		bool connected();
 
 	private:
 

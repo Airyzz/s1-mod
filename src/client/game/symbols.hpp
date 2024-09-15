@@ -289,6 +289,9 @@ namespace game
 		WEAK symbol<int> sv_serverId_value{0, 0x1488A9A60};
 
 		WEAK symbol<char> virtualLobby_loaded{0, 0x1417E161D};
+
+		WEAK symbol<game::mp::playerState_s> playerStates{ 0, 0x1414C1700 };
+		WEAK symbol<game::mp::pmove_t> pmoves{ 0, 0x1417A1860 };
 	}
 
 	namespace sp

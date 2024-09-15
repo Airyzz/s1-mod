@@ -16,6 +16,9 @@
 #include "command.hpp"
 #include "scheduler.hpp"
 #include "scripting.hpp"
+#include "demo_data.hpp"
+#include "demo_playback.h"
+
 namespace demo
 {
 	std::string get_dvar_string(const std::string& dvar)
@@ -45,9 +48,24 @@ namespace demo
 			}
 
 			buffer.write_int32(time);
+			buffer.write_int32(demo_data::DemoPacketType::SERVER_MESSAGE);
 			buffer.write_blob(data->data, data->cursize);
 			buffer.write_blob(data->splitData, data->splitSize);
 			auto d = buffer.get_buffer();
+			stream.write(d.data(), static_cast<std::streamsize>(d.size()));
+			stream.flush();
+		}
+
+		void write_client_data(int time, demo_data::demo_client_data_t* data) {
+			demonware::byte_buffer buffer;
+			buffer.set_use_data_types(false);
+
+			buffer.write_int32(time);
+			buffer.write_int32(demo_data::DemoPacketType::CLIENT_DATA);
+
+			buffer.write_blob((char*)data, (int)sizeof(demo_data::demo_client_data_t));
+			auto d = buffer.get_buffer();
+
 			stream.write(d.data(), static_cast<std::streamsize>(d.size()));
 			stream.flush();
 		}
@@ -162,6 +180,81 @@ namespace demo
 		return result;
 	}
 
+	void* cg_predict_player_state_stub(int localClientNum) {
+		auto result = utils::hook::invoke<void*>(0x1401B6B70, localClientNum);
+
+		if (recorder) {
+			demo_data::demo_client_data_t data;
+
+			data.commandTime = game::mp::pmoves->playerState->commandTime;
+			data.otherflags = game::mp::pmoves->playerState->otherflags;
+			data.pm_flags = game::mp::pmoves->playerState->pm_flags;
+			data.pm_time = game::mp::pmoves->playerState->pm_time;
+			data.pm_type = game::mp::pmoves->playerState->pm_type;
+			data.serverTime = game::mp::pmoves->playerState->serverTime;
+
+			data.cmd.serverTime = game::mp::pmoves->cmd.serverTime;
+			data.cmd.buttons = game::mp::pmoves->cmd.buttons;
+			data.cmd.angles_0 = game::mp::pmoves->cmd.angles_0;
+			data.cmd.angles_1 = game::mp::pmoves->cmd.angles_1;
+			data.cmd.angles_2 = game::mp::pmoves->cmd.angles_2;
+
+			data.prevCmd.serverTime =	game::mp::pmoves->oldcmd.serverTime;
+			data.prevCmd.buttons =		game::mp::pmoves->oldcmd.buttons;
+			data.prevCmd.angles_0 =		game::mp::pmoves->oldcmd.angles_0;
+			data.prevCmd.angles_1 =		game::mp::pmoves->oldcmd.angles_1;
+			data.prevCmd.angles_2 =		game::mp::pmoves->oldcmd.angles_2;
+
+
+
+			for (int i = 0; i < 3; i++) {
+				data.origin[i] = game::mp::pmoves->playerState->origin[i];
+				data.DeltaAngles[i] = game::mp::pmoves->playerState->DeltaAngles[i];
+				data.velocity[i] = game::mp::pmoves->playerState->velocity[i];
+				data.viewAngles[i] = game::mp::pmoves->playerState->viewAngles[i];
+			}
+
+			recorder->write_client_data(*game::mp::clientTime, &data);
+		}
+
+		auto reader = demo_playback::get_current_demo_reader();
+		if (reader->has_value()) {
+			auto val = (*reader)->get_current_client_data();
+
+			if (val) {
+				console::info("Overwrote predicted data with latest demo data!");
+
+				game::mp::pmoves->playerState->commandTime = val->commandTime;
+				game::mp::pmoves->playerState->otherflags = val->otherflags;
+				game::mp::pmoves->playerState->pm_flags = val->pm_flags;
+				game::mp::pmoves->playerState->pm_time = val->pm_time;
+				game::mp::pmoves->playerState->pm_type = val->pm_type;
+				game::mp::pmoves->playerState->serverTime = val->serverTime;
+
+				game::mp::pmoves->cmd.serverTime = val->cmd.serverTime;
+				game::mp::pmoves->cmd.buttons = val->cmd.buttons;
+				game::mp::pmoves->cmd.angles_0 = val->cmd.angles_0;
+				game::mp::pmoves->cmd.angles_1 = val->cmd.angles_1;
+				game::mp::pmoves->cmd.angles_2 = val->cmd.angles_2;
+
+				game::mp::pmoves->oldcmd.serverTime = val->prevCmd.serverTime;
+				game::mp::pmoves->oldcmd.buttons = val->prevCmd.buttons;
+				game::mp::pmoves->oldcmd.angles_0 = val->cmd.angles_0;
+				game::mp::pmoves->oldcmd.angles_1 = val->cmd.angles_1;
+				game::mp::pmoves->oldcmd.angles_2 = val->cmd.angles_2;
+
+				for (int i = 0; i < 3; i++) {
+					game::mp::playerStates->origin[i] = val->origin[i];
+					game::mp::playerStates->DeltaAngles[i] = val->DeltaAngles[i];
+					game::mp::playerStates->velocity[i] = val->velocity[i];
+					game::mp::playerStates->viewAngles[i] = val->viewAngles[i];
+				}
+			}
+		}
+
+		return result;
+	}
+
 	class component final : public component_interface
 	{
 	public:
@@ -170,6 +263,8 @@ namespace demo
 			cl_parseservermessage_hook.create(0x1402129B0, &cl_parseservermessage_stub);
 			cl_connectionlesspacket_hook.create(0x01402096E0, &cl_connectionlesspacket_stub);
 			cg_draw_active_frame_hook.create(0x1401D4710, &cg_drawactiveframe_stub);
+			
+			utils::hook::call(0x1401D4BD6, cg_predict_player_state_stub);
 
 			game::Dvar_RegisterInt("demo_rendering", 0, 0, 10, game::DVAR_FLAG_NONE, "is rendering in demo mode");
 

@@ -6,6 +6,8 @@
 #include "../../game.hpp"
 #include "component/scheduler.hpp"
 #include "component/timing.h"
+#include "component/demo_playback.h";
+
 namespace demonware
 {
 
@@ -13,97 +15,17 @@ namespace demonware
 
 	namespace theater {
 
-		std::mutex m;
-
-		class DemoReader {
-
-		private:
-			std::ifstream stream;
-
-		public:
-
-			std::string mapName;
-
-			std::string mode;
-
-			DemoReader(std::string filepath) {
-				stream = std::ifstream(
-					filepath, std::ios::binary | std::ifstream::in);
-
-				int mapNameLength;
-				stream.read(reinterpret_cast<char*>(&mapNameLength), sizeof(mapNameLength));
-
-
-				mapName.resize(mapNameLength);
-				stream.read(&mapName[0], mapNameLength);
-
-				int modeLength;
-				stream.read(reinterpret_cast<char*>(&modeLength), sizeof(modeLength));
-
-
-				mode.resize(modeLength);
-				stream.read(&mode[0], modeLength);
-
-				console::info("Demo reader created: %s  %s\n", mapName.data(), mode.data());
-			}
-
-			bool can_read_message() {
-
-			}
-
-			std::string read_next_message() {
-				int time;
-
-				int size;
-				int splitSize;
-				m.lock();
-
-				stream.read(reinterpret_cast<char*>(&time), sizeof(time));
-				stream.read(reinterpret_cast<char*>(&size), sizeof(size));
-
-				std::string data;
-				data.resize(size);
-
-				stream.read(&data[0], size);
-				stream.read(reinterpret_cast<char*>(&splitSize), sizeof(splitSize));
-
-				std::string splitData;
-				splitData.resize(splitSize);
-
-				stream.read(&splitData[0], splitSize);
-
-				m.unlock();
-
-				std::string result = data + splitData;
-
-				return result;
-			}
-
-			int peekNextMessageTime() {
-				int time;
-
-				m.lock();
-				stream.read(reinterpret_cast<char*>(&time), sizeof(time));
-				stream.seekg(-sizeof(time), std::ios_base::cur);
-				m.unlock();
-
-				return time;
-			}
-
-			void close() {
-				stream.close();
-			}
-		};
-
-		std::optional<DemoReader> reader;
 
 		void theater::theater_server::handle_get_info(const endpoint_data& endpoint, const std::string& packet) {
 			auto args = *game::sv_cmd_args;
 
-			if (!reader) {
+			auto reader = demo_playback::get_current_demo_reader();
+
+			if (!*reader) {
 				console::warn("No demo reader was ready to use to get info");
 				return;
 			}
+
 
 			byte_buffer buffer;
 			buffer.set_use_data_types(false);
@@ -126,10 +48,10 @@ namespace demonware
 			response += "\\hostname\\Demo_Server";
 			response += "\\gamename\\S1";
 			response += "\\sv_maxclients\\18";
-			response += "\\gametype\\" + (*reader).mode;
+			response += "\\gametype\\" + (*reader)->get_mode();
 			response += "\\sv_motd\\Loading Demo";
 			response += "\\xuid\\110000139E3FC15";
-			response += "\\mapname\\" + (*reader).mapName;
+			response += "\\mapname\\" + (*reader)->get_map_name();
 			response += "\\clients\\1";
 			response += "\\bots\\0";
 			response += "\\protocol\\61";
@@ -156,7 +78,7 @@ namespace demonware
 		std::optional<demonware::udp_server::endpoint_data> client_endpoint;
 
 		bool is_running() {
-			return client_endpoint && reader;
+			return client_endpoint && demo_playback::get_current_demo_reader()->has_value();
 		}
 
 		void theater_server::server_frame() {
@@ -164,34 +86,19 @@ namespace demonware
 				return;
 			}
 
-			console::info("Theater server time: [%d]\n", serverTime);
 
-			for (int i = 0; i < 1; i++) {
-
-				int msgTime = reader->peekNextMessageTime();
-				if (msgTime == 0xffffffff) {
-					auto msg = reader->read_next_message();
-					this->send(*client_endpoint, msg);
-					continue;
+			auto reader = demo_playback::get_current_demo_reader();
+			
+			while (true) {
+				auto msg = (*reader)->dequeue_server_message();
+				if (!msg) {
+					return;
 				}
 
-				if (firstMessageTime == -1) {
-					firstMessageTime = msgTime;
-					timeOffset = serverTime - msgTime;
-				}
-
-				int adjusted_msg_time = msgTime + timeOffset;
-
-				if (adjusted_msg_time > serverTime) {
-					break;
-				}
-
-				if (adjusted_msg_time <= serverTime) {
-					auto msg = reader->read_next_message();
-					this->send(*client_endpoint, msg);
-				}
+				this->send(*client_endpoint, *msg);
 			}
-
+			
+			console::info("Theater server time: [%d]\n", serverTime);
 		}
 
 
@@ -226,15 +133,15 @@ namespace demonware
 			}
 		}
 
-		void theater_server::set_demo_file(std::string filepath)
-		{
-			reader = DemoReader(filepath);
-		}
 
 		void theater_server::stop()
 		{
-			reader = std::nullopt;
 			client_endpoint = std::nullopt;
+		}
+
+		bool theater_server::connected()
+		{
+			return client_endpoint != std::nullopt;
 		}
 
 		void theater_server::handle_connect(const endpoint_data& endpoint, const std::string& packet) {
