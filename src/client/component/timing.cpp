@@ -13,6 +13,12 @@ namespace timing
 
 	void frame() {
 		*(float*)0x147B754EC = timescale->current.value;
+		*(float*)0x147B74C78 = timescale->current.value;
+
+		*(char*)0x147B74C60 = 0;
+		*(char*)0x147B74C7C = 0;
+
+		//game::Com_SetSlowMotion(timescale->current.value, timescale->current.value, 100);
 	}
 
 	class component final : public component_interface

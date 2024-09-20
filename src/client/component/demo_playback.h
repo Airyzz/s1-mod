@@ -16,6 +16,7 @@ namespace demo_playback
 		std::string mode;
 		std::list<std::string> server_queue;
 		demo_data::demo_client_data_t last_client_data;
+		demo_data::demo_client_data_t frames[256];
 
 
 		int peek_next_message_time();
@@ -26,13 +27,15 @@ namespace demo_playback
 
 	public:
 		demo_reader(std::string filepath);
-		std::optional<demo_data::demo_client_data_t> get_current_client_data();
+		std::optional<demo_data::demo_client_data_t> get_client_data_for_time(int time);
 		std::optional<std::string> dequeue_server_message();
 		std::string get_map_name();
 		std::string get_mode();
 
 		void read_frame(int ms);
+		void close();
 	};
 
+	bool is_playing();
 	std::optional<demo_reader>* get_current_demo_reader();
 }

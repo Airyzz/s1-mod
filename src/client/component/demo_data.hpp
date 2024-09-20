@@ -17,19 +17,11 @@ namespace demo_data
 	};
 
 	struct demo_client_data_t {
-
-		demo_client_command_t cmd;
-		demo_client_command_t prevCmd;
-
-		int commandTime;
-		int pm_type;
-		int pm_time;
-		int pm_flags;
-		int otherflags;
-		int serverTime;
+		int predictedDataServerTime;
 		game::vec3_t origin;
 		game::vec3_t velocity;
-		game::vec3_t DeltaAngles;
 		game::vec3_t viewAngles;
+		int bobCycle;
+		int movementDir;
 	};
 }

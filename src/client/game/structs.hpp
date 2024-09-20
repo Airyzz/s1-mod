@@ -3,6 +3,11 @@
 
 #define PROTOCOL 1
 
+#define STR_MERGE_IMPL(a, b) a##b
+#define STR_MERGE(a, b) STR_MERGE_IMPL(a, b)
+#define MAKE_PAD(size) STR_MERGE(_pad, __COUNTER__)[size]
+#define DEF_N(type, name, offset) struct {unsigned char MAKE_PAD(offset); type name;}
+
 namespace game
 {
 	typedef float vec_t;
@@ -1578,6 +1583,15 @@ namespace game
 		};
 
 
+		union playerstate {
+			DEF_N(int, bobCycle, 0xe);
+			DEF_N(game::vec3_t, origin, 0x78);
+			DEF_N(game::vec3_t, deltaAngles, 0x90);
+			DEF_N(game::vec3_t, velocity, 0x84);
+			DEF_N(int, movementDir, 0xd0);
+			DEF_N(game::vec3_t, viewAngles, 0x1b4);
+		};
+
 		struct pmove_t {
 			playerState_s* playerState;
 			usercmd_s cmd;
@@ -1609,6 +1623,15 @@ namespace game
 			TestClientType testClient; // 269600
 			char __pad5[391700];
 		}; // size = 661304
+
+		union clientActive_t {
+			DEF_N(game::vec3_t, cgameOrigin, 0x5228);
+			DEF_N(game::vec3_t, cgameVelocity, 0x5234);
+			DEF_N(int, cgameBobCycle , 0x52C0);
+			DEF_N(int, cgameMovementDir, 0x52c4);
+			DEF_N(int, cgamePredictedServerTime, 0x52CC);
+			DEF_N(game::vec3_t, cgameViewAngles, 0x52D0);
+		};
 	}
 
 	namespace sp

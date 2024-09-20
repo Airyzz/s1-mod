@@ -8,6 +8,8 @@
 #include "game/demonware/servers/theater_server.hpp"
 #include "demo_playback.h"
 #include "scheduler.hpp"
+#include <utils/hook.hpp>
+#include "scripting.hpp"
 
 namespace demo_playback
 {
@@ -35,11 +37,20 @@ namespace demo_playback
 		console::info("Demo reader created: %s  %s\n", map.data(), mode.data());
 
 		memset(&last_client_data, 0, sizeof(demo_data::demo_client_data_t));
+
+		memset(&frames, 0, sizeof(frames));
 	}
 
-	std::optional<demo_data::demo_client_data_t> demo_reader::get_current_client_data()
+	std::optional<demo_data::demo_client_data_t> demo_reader::get_client_data_for_time(int time)
 	{
-		return last_client_data;
+		console::info("attempting to read client data for frame: %d\n", time);
+
+		auto frame = frames[time % 256];
+
+		console::info("Found frame: %d\n", frame.predictedDataServerTime);
+		console::info("----\n");
+
+		return frame;
 	}
 
 	std::optional<std::string> demo_reader::dequeue_server_message()
@@ -108,24 +119,28 @@ namespace demo_playback
 		else {
 			demo_data::demo_client_data_t data;
 			stream.read((char*)&data, sizeof(data));
-			last_client_data = data;
+			
+			frames[data.predictedDataServerTime % 256] = data;
 		}
 	}
 
 	void demo_reader::read_message()
 	{
-		console::info("Demo reader reading message\n");
 
 		int time;
 		stream.read(reinterpret_cast<char*>(&time), sizeof(time));
+
+		console::info("Demo reader reading message: %d ", time);
 
 		int type;
 		stream.read(reinterpret_cast<char*>(&type), sizeof(type));
 
 		if (type == demo_data::DemoPacketType::SERVER_MESSAGE) {
+			console::info("SERVER_MESSAGE\n ");
 			read_server_message();
 		}
 		else if (type == demo_data::DemoPacketType::CLIENT_DATA) {
+			console::info("CLIENT_DATA\n ");
 			read_client_data();
 		}
 	}
@@ -134,7 +149,9 @@ namespace demo_playback
 	{
 		time += ms;
 
-		for (int i = 0; i < 10; i++) {
+		int file_offset = stream.tellg();
+
+		for (int i = 0; i < 20; i++) {
 			int msg_time = peek_next_message_time();
 
 			if (msg_time == 0xffffffff) {
@@ -142,16 +159,12 @@ namespace demo_playback
 				continue;
 			}
 
-			if (firstMessageTime == -1) {
+			if (msg_time > 0 && firstMessageTime <= 0) {
 				firstMessageTime = msg_time;
-				offsetTime = time - msg_time;
+				time = msg_time;
 			}
 
-
-			int adjusted_msg_time = msg_time + offsetTime;
-			console::info("[%d]ms msg_time: %d   offset: %d    time: %d  adjusted_time: %d\n", ms, msg_time, offsetTime, time, adjusted_msg_time);
-
-			if (adjusted_msg_time > time) {
+			if (msg_time > time) {
 				break;
 			}
 
@@ -159,7 +172,19 @@ namespace demo_playback
 		}
 	}
 
+	void demo_reader::close()
+	{
+		stream.close();
+	}
+
+
+
 	std::optional<demo_reader> current_reader;
+
+	bool is_playing()
+	{
+		return current_reader.has_value();
+	}
 
 	std::optional<demo_reader>* get_current_demo_reader()
 	{
@@ -167,6 +192,58 @@ namespace demo_playback
 	}
 
 	int prevFrameTime = 0;
+
+	utils::hook::detour cg_draw_active_frame_hook;
+	int cg_drawactiveframe_stub(int localClientNum, int serverTime, int demoType, void* cubemapShot, void* cubemapSize, void* renderScreen, void* idk) {
+		int demo = demoType;
+
+		if (is_playing()) {
+			demo = 1;
+		}
+
+		return cg_draw_active_frame_hook.invoke<int>(localClientNum, serverTime, demo, cubemapShot, cubemapSize, renderScreen, idk);
+	}
+
+	utils::hook::detour cl_get_predicted_player_information_for_server_time_hook;
+	int64_t cl_get_predicted_player_information_for_server_time_stub(game::mp::clientActive_t* cl, int serverTime, game::mp::playerstate* to) {
+		auto result = cl_get_predicted_player_information_for_server_time_hook.invoke<int64_t>(cl, serverTime, to);
+
+		console::info("Getting predicted info for server time %d   %llx   original result: %d\n", serverTime, to, result);
+
+		auto reader = demo_playback::get_current_demo_reader();
+		if (reader->has_value()) {
+			auto val = (*reader)->get_client_data_for_time(serverTime);
+
+			if (val) {
+				console::info("Overwriting data  [%f, %f, %f]  <-- [%f, %f, %f]\n", to->origin[0], to->origin[1], to->origin[2], (*val).origin[0], (*val).origin[1], (*val).origin[2]);
+				to->origin[0] = (*val).origin[0];
+				to->origin[1] = (*val).origin[1];
+				to->origin[2] = (*val).origin[2];
+
+
+				to->viewAngles[0] = (*val).viewAngles[0];
+				to->viewAngles[1] = (*val).viewAngles[1];
+				to->viewAngles[2] = (*val).viewAngles[2];
+
+				to->velocity[0] = (*val).velocity[0];
+				to->velocity[1] = (*val).velocity[1];
+				to->velocity[2] = (*val).velocity[2];
+
+				to->bobCycle = (*val).bobCycle;
+				to->movementDir = (*val).movementDir;
+
+
+
+
+				return 1;
+			}
+
+		}
+
+		return result;
+	}
+
+
 
 	class component final : public component_interface
 	{
@@ -195,11 +272,24 @@ namespace demo_playback
 					int time = *game::com_frameTime;
 					int delta = time - prevFrameTime;
 					prevFrameTime = time;
+
 					delta = game::Com_TimeScaleMsec(delta);
 
 					current_reader->read_frame(delta);
 				}
 			});
+
+			scripting::on_shutdown([](int free_scripts)
+			{
+				console::info("==== DEMO PLAYBACK SHUTDOWN ====\n");
+				//if (current_reader) {
+				//	current_reader->close();
+				//	current_reader = std::nullopt;
+				//}
+			});
+
+			cg_draw_active_frame_hook.create(0x1401D4710, &cg_drawactiveframe_stub);
+			cl_get_predicted_player_information_for_server_time_hook.create(0x140210FF0, &cl_get_predicted_player_information_for_server_time_stub);
 		}
 	};
 }

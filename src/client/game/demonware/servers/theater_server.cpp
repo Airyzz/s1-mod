@@ -5,7 +5,6 @@
 #include <utils/hexdump.hpp>
 #include "../../game.hpp"
 #include "component/scheduler.hpp"
-#include "component/timing.h"
 #include "component/demo_playback.h";
 
 namespace demonware
@@ -54,10 +53,10 @@ namespace demonware
 			response += "\\mapname\\" + (*reader)->get_map_name();
 			response += "\\clients\\1";
 			response += "\\bots\\0";
-			response += "\\protocol\\61";
+			response += "\\protocol\\1";
 			response += "\\sv_running\\1";
-			response += "\\dedicated\\0";
-			response += "\\shortversion\\1.22";
+			response += "\\dedicated\\1";
+			response += "\\shortversion\\0.0.1";
 
 
 			buffer.write_string(response);
@@ -87,18 +86,6 @@ namespace demonware
 			}
 
 
-			auto reader = demo_playback::get_current_demo_reader();
-			
-			while (true) {
-				auto msg = (*reader)->dequeue_server_message();
-				if (!msg) {
-					return;
-				}
-
-				this->send(*client_endpoint, *msg);
-			}
-			
-			console::info("Theater server time: [%d]\n", serverTime);
 		}
 
 
@@ -109,28 +96,21 @@ namespace demonware
 		}
 
 		void theater_server::frame() {
+			if (is_running()) {
+				auto reader = demo_playback::get_current_demo_reader();
+
+				while (true) {
+					auto msg = (*reader)->dequeue_server_message();
+					if (!msg) {
+						return;
+					}
+
+					console::info("Theater server sendin message\n", serverTime);
+					this->send(*client_endpoint, *msg);
+				}
+			}
+
 			udp_server::frame();
-
-			if (!is_running()) {
-				return;
-			}
-
-			int time = *game::com_frameTime;
-			int delta = time - prevFrameTime;
-
-			delta = game::Com_TimeScaleMsec(delta);
-
-			prevFrameTime = time;
-
-			msecsToProcess += delta;
-
-			const int rate = 50;
-
-			while (msecsToProcess > rate) {
-				msecsToProcess -= rate;
-				serverTime += rate;
-				this->server_frame();
-			}
 		}
 
 
@@ -145,6 +125,7 @@ namespace demonware
 		}
 
 		void theater_server::handle_connect(const endpoint_data& endpoint, const std::string& packet) {
+			console::info("Received connection request\n");
 			client_endpoint = endpoint;
 			prevFrameTime = *game::com_frameTime;
 		}
