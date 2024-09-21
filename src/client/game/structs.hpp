@@ -1415,6 +1415,18 @@ namespace game
 
 	static_assert(sizeof(pml_t) == 0x130);
 
+	struct refdef_t {
+		unsigned char __pad0[0x10];
+		float tanHalfFovX;
+		float tanHalfFovY;
+		vec3_t origin;
+		float axis[9];
+		float __u1;
+		float __u2;
+		vec3_t viewOffset;
+		vec3_t viewOffsetPrev;
+	};
+
 	namespace mp
 	{
 		struct cachedSnapshot_t

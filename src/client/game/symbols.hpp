@@ -204,6 +204,8 @@ namespace game
 
 	WEAK symbol<void(int index, const char* string)> SV_SetConfigstring{0, 0x14043FCA0};
 
+	WEAK symbol<void(game::vec4_t quat, float* axis)> QuatToAxis{ 0, 0x001404B3910 };
+
 	WEAK symbol<void(char* path, int pathSize, Sys_Folder folder, const char* filename, const char* ext)>
 	Sys_BuildAbsPath{0x14037BBE0, 0x1404CC7E0};
 	WEAK symbol<HANDLE(int folder, const char* baseFileName)> Sys_CreateFile{0x14037BCA0, 0x1404CC8A0};
@@ -228,6 +230,8 @@ namespace game
 
 	WEAK symbol<void*(jmp_buf* Buf, int Value)> longjmp{0x14059C5C0, 0x1406FD930};
 	WEAK symbol<int(jmp_buf* Buf)> _setjmp{0x14059CD00, 0x1406FE070};
+
+	WEAK symbol<void* (game::mp::gentity_s*, game::vec3_t, game::vec3_t)> G_SetSpectatorPosition{0x0, 0x1402EA370};
 
 	/***************************************************************
 	 * Variables
@@ -273,6 +277,8 @@ namespace game
 	WEAK symbol<int> com_frameTime{ 0, 0x147B74C58 };
 
 	WEAK symbol<int> connectionStatus{ 0, 0x1417E1690 };
+
+	WEAK symbol<refdef_t> refdef{ 0, 0x1415575c0 };
 
 	namespace mp
 	{

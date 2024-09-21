@@ -130,17 +130,17 @@ namespace demo_playback
 		int time;
 		stream.read(reinterpret_cast<char*>(&time), sizeof(time));
 
-		console::info("Demo reader reading message: %d ", time);
+		//console::info("Demo reader reading message: %d ", time);
 
 		int type;
 		stream.read(reinterpret_cast<char*>(&type), sizeof(type));
 
 		if (type == demo_data::DemoPacketType::SERVER_MESSAGE) {
-			console::info("SERVER_MESSAGE\n ");
+			//console::info("SERVER_MESSAGE\n ");
 			read_server_message();
 		}
 		else if (type == demo_data::DemoPacketType::CLIENT_DATA) {
-			console::info("CLIENT_DATA\n ");
+			//console::info("CLIENT_DATA\n ");
 			read_client_data();
 		}
 	}

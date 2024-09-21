@@ -12,90 +12,108 @@
 #include "dvars.hpp"
 #include <utils/hook.hpp>
 #include <utils/string.hpp>
+#include "theater_camera.h"
+#include "demo_playback.h"
 
 namespace theater_camera
 {
-	namespace
+
+	const char* modes[] =
 	{
-		const game::dvar_t* demo_camera;
-		const game::dvar_t* r_disable_boost_fx;
-		const game::dvar_t* r_disable_all;
-		const game::dvar_t* r_disable_specific;
-		const game::dvar_t* r_disable_shellshock;
+		"first_person",
+		"third_person",
+		"freecam",
+		(char*)0,
+	};
 
-		utils::hook::detour cl_renderscene_hook;
+	const game::dvar_t* demo_camera_mode;
+	utils::hook::detour bg_is_thirdperson_hook;
+	utils::hook::detour cg_calc_view_values_hook;
+	utils::hook::detour cl_renderscene_hook;
+	utils::hook::detour r_update_lod_parms_hook;
 
-		utils::hook::detour should_draw_post_fx_type_hook;
-		utils::hook::detour cg_disable_shellshock_blend_hook;
+	game::vec3_t freecam_pos;
+	game::vec4_t freecam_quat;
 
-		uint64_t cl_render_scene_stub(int localClientNum, game::refdef_t* refdef, void* u1, void* u2) {
-			auto result = cl_renderscene_hook.invoke<uint64_t>(localClientNum, refdef, u1, u2);
-		
-			console::info("Rendering scene with refdef: %llx  %llx  %llx, (%f, %f, %f)\n", refdef, u1, u2, refdef->origin[0], refdef->origin[1], refdef->origin[2]);
+
+	bool bg_is_thirdperson_stub(game::playerState_s* state) {
+		if (demo_playback::is_playing() == false) {
+			return bg_is_thirdperson_hook.invoke<bool>(state);
+		}
+
+		if (demo_camera_mode->current.integer == THEATER_CAMERA_FIRST_PERSON) {
+			return false;
+		}
+
+		return true;
+	}
+
+	uint64_t calc_view_values_stub(int localClientNum, void* a2) {
+		auto result = cg_calc_view_values_hook.invoke<uint64_t>(localClientNum, a2);
+
+		if (demo_camera_mode->current.integer == THEATER_CAMERA_FREECAM) {
 			
 
-			return result;
+			for (int i = 0; i < 3; i++) {
+				game::refdef->origin[i] = freecam_pos[i];
+				//refdef->viewOffset[i] = 0;
+				//refdef->viewOffsetPrev[i] = 0;
+
+				game::QuatToAxis(freecam_quat, game::refdef->axis);
+			}
 		}
 
-		uint64_t cg_draw_shellshock_blend_stub(uint64_t a1) {
-			if (r_disable_shellshock->current.enabled) {
-				return 0;
-			}
+		return result;
+	}
 
-			return cg_disable_shellshock_blend_hook.invoke<uint64_t>(a1);
+	void r_update_lod_parms_stub(void* a1, void* a2, float a3) {
+		console::info("Updating lod parms: %llx, %llx, %f\n", a1, a2, a3);
+
+		//TODO: a1 points to refdef->tanHalfFovX, so we need to account for FOV here in the future
+
+		if (demo_playback::is_playing() && demo_camera_mode->current.integer == THEATER_CAMERA_FREECAM) {
+			game::refdef->origin[0] = freecam_pos[0];
+			game::refdef->origin[1] = freecam_pos[1];
+			game::refdef->origin[2] = freecam_pos[2];
 		}
 
-		bool should_draw_post_fx_type_stub(void* a1, int type) {
+		r_update_lod_parms_hook.invoke(a1, a2, a3);
+	}
 
-			console::info("Should draw fx %d: ", type);
+	void set_immediate_mode_camera_pos(game::vec3_t pos)
+	{
+		freecam_pos[0] = pos[0];
+		freecam_pos[1] = pos[1];
+		freecam_pos[2] = pos[2];
+	}
 
-			// 16 is glass
-
-			// Disable motion blur
-			if (r_disable_boost_fx->current.enabled) {
-				if (type == 28) {
-					console::info("disabled by fx override \n");
-					return false;
-				}
-			}
-
-			if (r_disable_all->current.enabled) {
-				return false;
-			}
-
-			if (type == r_disable_specific->current.integer) {
-				return false;
-			}
-
-			bool result = should_draw_post_fx_type_hook.invoke<bool>(a1, type);
-
-			console::info("= %d \n", result);
-			return result;
+	void set_immediate_mode_camera_quat(game::vec4_t quat)
+	{
+		for (int i = 0; i < 4; i++) {
+			freecam_quat[i] = quat[i];
 		}
 	}
+
+	camera_mode get_current_mode()
+	{
+		return (camera_mode)demo_camera_mode->current.integer;
+	}
+
+
 
 	class component final : public component_interface
 	{
 	public:
 		void post_unpack() override
 		{
-			dvars::override::register_bool("camera_thirdPerson", false, game::DVAR_FLAG_NONE);
-
-			cl_renderscene_hook.create(0x1401FD680, cl_render_scene_stub);
-			should_draw_post_fx_type_hook.create(0x1405FAE90, should_draw_post_fx_type_stub);
-			cg_disable_shellshock_blend_hook.create(0x1401D5420, cg_draw_shellshock_blend_stub);
-
-			demo_camera = game::Dvar_RegisterBool("demo_camera", false, game::DVAR_FLAG_NONE, "Do demo camera");
-			r_disable_boost_fx = game::Dvar_RegisterBool("r_disable_boost_fx", false, game::DVAR_FLAG_NONE, "Disable screen fx");
-			r_disable_all = game::Dvar_RegisterBool("r_disable_all", false, game::DVAR_FLAG_NONE, "Disable screen fx");
-
-			r_disable_shellshock = game::Dvar_RegisterBool("r_disableShellshock", false, game::DVAR_FLAG_NONE, "Disable shellshock fx");
-
-			r_disable_specific = game::Dvar_RegisterInt("r_disable_specific", 0, 0, 1000, game::DVAR_FLAG_NONE, "Disable some fx");
-
-			game::Dvar_RegisterInt("ground_slam_debug", 1, 0, 1, game::DVAR_FLAG_NONE, "Some debug ground slam var");
+			bg_is_thirdperson_hook.create(0x14013C360, bg_is_thirdperson_stub);
+			cg_calc_view_values_hook.create(0x1401DC450, calc_view_values_stub);
+			r_update_lod_parms_hook.create(0x01405D3CA0, r_update_lod_parms_stub);
+			demo_camera_mode = game::Dvar_RegisterEnum("demo_camera", modes, 0, game::DVAR_FLAG_NONE, "");
 		}
 	};
+
+
 }
 
 REGISTER_COMPONENT(theater_camera::component)
