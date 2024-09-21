@@ -208,14 +208,11 @@ namespace demo_playback
 	int64_t cl_get_predicted_player_information_for_server_time_stub(game::mp::clientActive_t* cl, int serverTime, game::mp::playerstate* to) {
 		auto result = cl_get_predicted_player_information_for_server_time_hook.invoke<int64_t>(cl, serverTime, to);
 
-		console::info("Getting predicted info for server time %d   %llx   original result: %d\n", serverTime, to, result);
-
 		auto reader = demo_playback::get_current_demo_reader();
 		if (reader->has_value()) {
 			auto val = (*reader)->get_client_data_for_time(serverTime);
 
 			if (val) {
-				console::info("Overwriting data  [%f, %f, %f]  <-- [%f, %f, %f]\n", to->origin[0], to->origin[1], to->origin[2], (*val).origin[0], (*val).origin[1], (*val).origin[2]);
 				to->origin[0] = (*val).origin[0];
 				to->origin[1] = (*val).origin[1];
 				to->origin[2] = (*val).origin[2];
@@ -231,13 +228,8 @@ namespace demo_playback
 
 				to->bobCycle = (*val).bobCycle;
 				to->movementDir = (*val).movementDir;
-
-
-
-
 				return 1;
 			}
-
 		}
 
 		return result;

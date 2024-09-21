@@ -183,8 +183,6 @@ namespace demo
 
 
 		if (recorder) {
-			console::info("Saving client active: %llx   %d  (%d)  [%d]\n", clientActive, serverTime, *game::mp::clientTime, clientActive->cgamePredictedServerTime);
-
 			auto state = (game::mp::playerstate**)(0x01417A1860);
 
 			demo_data::demo_client_data_t data;
@@ -203,8 +201,6 @@ namespace demo
 
 			data.bobCycle = clientActive->cgameBobCycle;
 			data.movementDir = clientActive->cgameMovementDir;
-
-			console::info("Saving client active: %f %f %f\n", data.origin[0], data.origin[0], data.origin[0] );
 
 			recorder->write_client_data(*game::mp::clientTime, &data);
 		}
