@@ -33,6 +33,10 @@ namespace theater_blender
 		SOCKET server_socket;
 		sockaddr_in server_address;
 
+
+		std::optional<sockaddr> client;
+		socklen_t client_len;
+
 		float make_big_endian(float value)
 		{
 			int val = *reinterpret_cast<int*>(&value);
@@ -43,6 +47,14 @@ namespace theater_blender
 				((val >> 24) & 0x000000ff);
 
 			return  *reinterpret_cast<float*>(&val);
+		}
+
+		int make_big_endian_int(int val)
+		{
+			return  (val << 24) |
+				((val << 8) & 0x00ff0000) |
+				((val >> 8) & 0x0000ff00) |
+				((val >> 24) & 0x000000ff);
 		}
 
 		void quaternion_mult(game::vec4_t in1, game::vec4_t in2, game::vec4_t out)
@@ -83,52 +95,113 @@ namespace theater_blender
 			out[2] = in[2] * 39.37008;
 		}
 
-
-		void handle_immediate_mode(demonware::byte_buffer buffer) {
-			game::vec3_t pos;
-			game::vec4_t quat;
-			float fov;
-
-			bool useDof;
-
-			float focalLength;
-			float fstop;
-			float focalDistance;
+		camera_data_t read_camera_data(demonware::byte_buffer *buffer) {
+			camera_data_t camera;
 
 			for (int i = 0; i < 3; i++) {
-				buffer.read_float(&pos[i]);
-				pos[i] = make_big_endian(pos[i]);
+				float x;
+				buffer->read_float(&x);
+				camera.pos[i] = make_big_endian(x);
 			}
 
 			for (int i = 0; i < 4; i++) {
 				/// wxyz
-				buffer.read_float(&quat[i]);
-				quat[i] = make_big_endian(quat[i]);
+				float x;
+				buffer->read_float(&x);
+				camera.quat[i] = make_big_endian(x);
 			}
 
-			buffer.read_float(&fov);
-			fov = make_big_endian(fov);
+			buffer->read_float(&camera.fov);
+			camera.fov = make_big_endian(camera.fov);
+			buffer->read_bool(&camera.use_dof);
 
-			buffer.read_bool(&useDof);
+			if (camera.use_dof) {
+				buffer->read_float(&camera.dof_focal_length);
+				buffer->read_float(&camera.dof_fstop);
+				buffer->read_float(&camera.dof_focal_distance);
 
-			if (useDof) {
-				buffer.read_float(&focalLength);
-				buffer.read_float(&fstop);
-				buffer.read_float(&focalDistance);
-
-				focalLength = make_big_endian(focalLength);
-				fstop = make_big_endian(fstop);
-				focalDistance = make_big_endian(focalDistance);
+				camera.dof_focal_length = make_big_endian(camera.dof_focal_length);
+				camera.dof_fstop = make_big_endian(camera.dof_fstop);
+				camera.dof_focal_distance = make_big_endian(camera.dof_focal_distance);
 			}
 
 			game::vec3_t converted_pos;
-			blender_coord_to_cod_coord(pos, converted_pos);
+			blender_coord_to_cod_coord(&camera.pos[0], converted_pos);
 
 			game::vec4_t converted_rot;
-			blender_quat_to_cod_quat(quat, converted_rot);
+			blender_quat_to_cod_quat(&camera.quat[0], converted_rot);
 
-			theater_camera::set_immediate_mode_camera_pos(converted_pos);
-			theater_camera::set_immediate_mode_camera_quat(converted_rot);
+			for (int i = 0; i < 3; i++) {
+				camera.pos[i] = converted_pos[i];
+			}
+
+			for (int i = 0; i < 4; i++) {
+				camera.quat[i] = converted_rot[i];
+			}
+
+			return camera;
+		}
+
+		void handle_immediate_mode(demonware::byte_buffer buffer) {
+			auto cam = read_camera_data(&buffer);
+			if (demo_playback::is_playing()) {
+				if (theater_camera::get_current_mode() == THEATER_CAMERA_FREECAM) {
+					theater_camera::set_camera_immediate_mode(cam);
+				}
+			}
+		}
+
+		void handle_bake_data(demonware::byte_buffer buffer) {
+			int num_frames = 0;
+			buffer.read_int32(&num_frames);
+			num_frames = make_big_endian_int(num_frames);
+
+			std::vector<camera_keyframe_t> frames;
+			
+			for (int i = 0; i < num_frames; i++) {
+
+				camera_keyframe_t frame;
+
+				int frame_time;
+				buffer.read_int32(&frame_time);
+				frame_time = make_big_endian_int(frame_time);
+				frame_time *= 20;
+
+				frame.frame_time = frame_time;
+
+				frame.camera = read_camera_data(&buffer);
+				console::info("Got baked camera frame: %f     %f    %f\n", frame.camera.pos[0], frame.camera.pos[1], frame.camera.pos[2]);
+				frames.push_back(frame);
+			}
+
+			theater_camera::set_dolly_markers(frames);
+		}
+
+		void send_snapshot() {
+
+			if (demo_playback::is_playing() && client.has_value()) {
+
+				int time = (*demo_playback::get_current_demo_reader())->get_time();
+				if (time <= 0) {
+					return;
+				}
+
+				auto cl = *client;
+				demonware::byte_buffer buffer;
+				buffer.set_use_data_types(false);
+				buffer.write_byte(BLENDER_MSG_SNAPSHOT);
+
+				time /= 20;
+				time = make_big_endian_int(time);
+
+				buffer.write_uint32(time);
+				buffer.write_float(make_big_endian(0.0f));
+
+				auto data = buffer.get_buffer();
+
+				sendto(server_socket, data.data(), data.length(), 0, &cl, client_len);
+			}
+
 		}
 
 		void on_message(std::string data) {
@@ -143,6 +216,9 @@ namespace theater_blender
 			case BLENDER_MSG_SET_CAMERA_IMMEDIATE_MODE:
 				handle_immediate_mode(buffer);
 				break;
+			case BLENDER_MSG_BAKE_DATA:
+				handle_bake_data(buffer);
+				break;
 			default:
 				console::info("Received data on blender server!\n");
 				utils::hexdump::dump_hex_to_stdout(data);
@@ -150,19 +226,34 @@ namespace theater_blender
 			}
 		}
 
+		int last_snapshot_frame = 0;
+		char buffer[USHRT_MAX];
+
 		void loop() {
-			char buffer[USHRT_MAX];
+			int frame = *game::com_frameTime;
+
 			memset(buffer, 0, sizeof(buffer));
 
 			sockaddr from;
 			memset(&from, 0, sizeof(from));
 			socklen_t len = sizeof(from);
 
+			if (frame - last_snapshot_frame > 10) {
+				last_snapshot_frame = frame;
+				if (client.has_value() && demo_playback::is_paused() == false) {
+					send_snapshot();
+				}
+			}
+
 			while (true) {
 				auto n = recvfrom(server_socket, buffer, sizeof(buffer), 0, &from, &len);
 
 				if (n > 0) {
 					auto data = std::string(buffer, n);
+
+					client = from;
+					client_len = len;
+
 					on_message(data);
 				}
 				else {
@@ -186,7 +277,7 @@ namespace theater_blender
 				console::info("Failed to create blender server socket\n");
 				return;
 			}
-			
+
 			u_long mode = 1;  // 1 to enable non-blocking socket
 			ioctlsocket(server_socket, FIONBIO, &mode);
 
@@ -195,7 +286,7 @@ namespace theater_blender
 			server_address.sin_family = AF_INET;
 			server_address.sin_addr.S_un.S_addr = INADDR_ANY;
 			server_address.sin_port = htons(25565);
- 
+
 			if (bind(server_socket, (const struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
 				console::info("Failed to bind address\n");
 				return;

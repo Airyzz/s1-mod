@@ -23,6 +23,7 @@ namespace theater_camera
 		"first_person",
 		"third_person",
 		"freecam",
+		"dolly",
 		(char*)0,
 	};
 
@@ -34,6 +35,8 @@ namespace theater_camera
 
 	game::vec3_t freecam_pos;
 	game::vec4_t freecam_quat;
+
+	std::optional<std::vector<camera_keyframe_t>> dolly_frames;
 
 
 	bool bg_is_thirdperson_stub(game::playerState_s* state) {
@@ -48,12 +51,79 @@ namespace theater_camera
 		return true;
 	}
 
+	std::tuple<std::optional<camera_keyframe_t>, std::optional<camera_keyframe_t>> find_lerp_markers(int time) {
+		if (dolly_frames.has_value() == false) {
+			return { std::nullopt, std::nullopt };
+		}
+
+		auto first = (*dolly_frames).at(0);
+
+		if (time < first.frame_time) {
+			return { first, std::nullopt };
+		}
+		
+		for (int i = 0; i < (*dolly_frames).size() - 1; i++) {
+			auto marker = (*dolly_frames).at(i);
+			auto marker_next = (*dolly_frames).at(i + 1);
+
+
+			if (marker.frame_time < time && marker_next.frame_time > time) {
+				return { marker, marker_next };
+			}
+		}
+
+		return { std::nullopt, std::nullopt };
+	}
+
+	camera_keyframe_t lerp_cameras(camera_keyframe_t a, camera_keyframe_t b, int current_time) {
+		if (a.frame_time >= b.frame_time) {
+			return a;
+		}
+
+		camera_keyframe_t result = a;
+
+		float start = (float)a.frame_time;
+		float end = (float)b.frame_time;
+		float now = (float)current_time;
+		float diff = end - start;
+		float offset = current_time - start;
+
+		float alpha = std::clamp(offset / diff, 0.0f, 1.0f);
+
+		for (int i = 0; i < 3; i++) {
+			result.camera.pos[i] = std::lerp(a.camera.pos[i], b.camera.pos[i], alpha);
+		}
+
+		game::QuatLerp(&a.camera.quat[0], &b.camera.quat[0], alpha, &result.camera.quat[0]);
+
+		return result;
+	}
+
 	uint64_t calc_view_values_stub(int localClientNum, void* a2) {
 		auto result = cg_calc_view_values_hook.invoke<uint64_t>(localClientNum, a2);
 
-		if (demo_camera_mode->current.integer == THEATER_CAMERA_FREECAM) {
-			
 
+		if (demo_camera_mode->current.integer == THEATER_CAMERA_DOLLY) {
+			auto player = demo_playback::get_current_demo_reader();
+			if (player) {
+				int time = (*player)->get_time();
+				auto markers = find_lerp_markers(time);
+				auto current_camera = std::get<0>(markers);
+
+				if (current_camera) {
+					auto marker = *current_camera;
+
+					auto second = std::get<1>(markers);
+					if (second) {
+						marker = lerp_cameras(marker, *second, time);
+					}
+
+					set_camera_immediate_mode(marker.camera);
+				}
+			}
+		}
+
+		if (demo_camera_mode->current.integer == THEATER_CAMERA_FREECAM || demo_camera_mode->current.integer == THEATER_CAMERA_DOLLY) {
 			for (int i = 0; i < 3; i++) {
 				game::refdef->origin[i] = freecam_pos[i];
 				//refdef->viewOffset[i] = 0;
@@ -68,7 +138,7 @@ namespace theater_camera
 
 	void r_update_lod_parms_stub(void* a1, void* a2, float a3) {
 
-		if (demo_playback::is_playing() && demo_camera_mode->current.integer == THEATER_CAMERA_FREECAM) {
+		if (demo_playback::is_playing() && demo_camera_mode->current.integer == THEATER_CAMERA_FREECAM || demo_camera_mode->current.integer == THEATER_CAMERA_DOLLY) {
 			game::refdef->origin[0] = freecam_pos[0];
 			game::refdef->origin[1] = freecam_pos[1];
 			game::refdef->origin[2] = freecam_pos[2];
@@ -77,18 +147,9 @@ namespace theater_camera
 		r_update_lod_parms_hook.invoke(a1, a2, a3);
 	}
 
-	void set_immediate_mode_camera_pos(game::vec3_t pos)
-	{
-		freecam_pos[0] = pos[0];
-		freecam_pos[1] = pos[1];
-		freecam_pos[2] = pos[2];
-	}
-
 	void set_immediate_mode_camera_quat(game::vec4_t quat)
 	{
-		for (int i = 0; i < 4; i++) {
-			freecam_quat[i] = quat[i];
-		}
+
 	}
 
 	camera_mode get_current_mode()
@@ -96,7 +157,21 @@ namespace theater_camera
 		return (camera_mode)demo_camera_mode->current.integer;
 	}
 
+	void set_camera_immediate_mode(camera_data_t camera)
+	{
+		freecam_pos[0] = camera.pos[0];
+		freecam_pos[1] = camera.pos[1];
+		freecam_pos[2] = camera.pos[2];
 
+		for (int i = 0; i < 4; i++) {
+			freecam_quat[i] = camera.quat[i];
+		}
+	}
+
+	void set_dolly_markers(std::vector<camera_keyframe_t> markers)
+	{
+		dolly_frames = markers;
+	}
 
 	class component final : public component_interface
 	{

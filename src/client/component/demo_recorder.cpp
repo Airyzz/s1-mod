@@ -132,7 +132,6 @@ namespace demo
 
 
 		if (demo_playback::is_playing()) {
-			console::info("CL_ParseServerMessage called during demo playback");
 			return;
 		}
 

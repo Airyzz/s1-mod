@@ -39,8 +39,10 @@ namespace demo_playback
 		void close();
 		void restart();
 		void jump_to(int time);
+		int get_time();
 	};
 
+	bool is_paused();
 	bool is_playing();
 	std::optional<demo_reader>* get_current_demo_reader();
 }

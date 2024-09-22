@@ -13,6 +13,9 @@
 
 namespace demo_playback
 {
+
+	game::dvar_t* demo_paused;
+
 	demo_reader::demo_reader(std::string filepath)
 	{
 		time = 0;
@@ -46,14 +49,13 @@ namespace demo_playback
 
 	std::optional<demo_data::demo_client_data_t> demo_reader::get_client_data_for_time(int time)
 	{
-		console::info("attempting to read client data for frame: %d\n", time);
-
 		auto frame = frames[time % 256];
-
-		console::info("Found frame: %d\n", frame.predictedDataServerTime);
-		console::info("----\n");
-
-		return frame;
+		if (frame.predictedDataServerTime == time) {
+			return frame;
+		}
+		else {
+			return std::nullopt;
+		}
 	}
 
 	std::optional<std::string> demo_reader::dequeue_server_message()
@@ -103,10 +105,6 @@ namespace demo_playback
 			sequenceNumber += 1;
 		}
 
-
-		console::info("Sequence number: %d   vs    %d\n", originalSeq, sequenceNumber);
-		
-		
 		int splitSize;
 		std::string splitData;
 		stream.read(reinterpret_cast<char*>(&splitSize), sizeof(splitSize));
@@ -144,8 +142,6 @@ namespace demo_playback
 		int time;
 		stream.read(reinterpret_cast<char*>(&time), sizeof(time));
 
-		console::info("Demo reader reading message: %d \n", time);
-
 		int type;
 		stream.read(reinterpret_cast<char*>(&type), sizeof(type));
 
@@ -170,7 +166,6 @@ namespace demo_playback
 		while(true) {
 			int msg_time = peek_next_message_time();
 
-			console::info("Next message time: %d   currTime: %d \n", msg_time, time);
 			if (msg_time == 0xffffffff) {
 				read_message();
 				continue;
@@ -214,7 +209,17 @@ namespace demo_playback
 		read_frame(0);
 	}
 
+	int demo_reader::get_time()
+	{
+		return time;
+	}
+
 	std::optional<demo_reader> current_reader;
+
+	bool is_paused()
+	{
+		return demo_paused->current.enabled;
+	}
 
 	bool is_playing()
 	{
@@ -277,6 +282,8 @@ namespace demo_playback
 	public:
 		void post_unpack() override
 		{
+			demo_paused = game::Dvar_RegisterBool("demo_paused", false, game::DVAR_FLAG_NONE, "Pause demo playback");
+
 			command::add("demo_play", [](const command::params& params)
 			{
 				if (params.size() == 2) {

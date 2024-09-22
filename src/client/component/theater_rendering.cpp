@@ -29,7 +29,6 @@ namespace theater_rendering
 
 		uint64_t cl_render_scene_stub(int localClientNum, game::refdef_t* refdef, void* u1, void* u2) {
 			auto result = cl_renderscene_hook.invoke<uint64_t>(localClientNum, refdef, u1, u2);
-			console::info("Rendering scene with refdef: %llx  %llx  %llx, (%f, %f, %f)\n", refdef, u1, u2, refdef->origin[0], refdef->origin[1], refdef->origin[2]);
 			return result;
 		}
 

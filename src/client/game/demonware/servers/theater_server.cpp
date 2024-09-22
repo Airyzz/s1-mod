@@ -84,14 +84,11 @@ namespace demonware
 			if (!is_running()) {
 				return;
 			}
-
-
 		}
 
 
 		theater_server::theater_server(std::string name) : udp_server(name)
 		{
-			console::info("THEATER SERVER CREATED!!!");
 			instance = this;
 		}
 
@@ -105,7 +102,6 @@ namespace demonware
 						return;
 					}
 
-					console::info("Theater server sendin message\n", serverTime);
 					this->send(*client_endpoint, *msg);
 				}
 			}
