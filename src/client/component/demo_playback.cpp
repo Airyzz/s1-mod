@@ -18,6 +18,7 @@ namespace demo_playback
 		time = 0;
 		firstMessageTime = -1;
 		offsetTime = 0;
+		sequenceNumber = 0;
 
 		stream = std::ifstream(
 			filepath, std::ios::binary | std::ifstream::in);
@@ -35,6 +36,8 @@ namespace demo_playback
 		stream.read(&mode[0], modeLength);
 
 		console::info("Demo reader created: %s  %s\n", map.data(), mode.data());
+
+		firstMessageFileOffset = stream.tellg();
 
 		memset(&last_client_data, 0, sizeof(demo_data::demo_client_data_t));
 
@@ -91,6 +94,17 @@ namespace demo_playback
 
 		data.resize(size);
 		stream.read(&data[0], size);
+
+		int originalSeq = *((int*)&data[0]);
+
+		if (originalSeq != -1) {
+			// overwrite sequence number with our own, so when we rewind it doesnt ignore packets from the past
+			*((int*)&data[0]) = sequenceNumber;
+			sequenceNumber += 1;
+		}
+
+
+		console::info("Sequence number: %d   vs    %d\n", originalSeq, sequenceNumber);
 		
 		
 		int splitSize;
@@ -130,7 +144,7 @@ namespace demo_playback
 		int time;
 		stream.read(reinterpret_cast<char*>(&time), sizeof(time));
 
-		//console::info("Demo reader reading message: %d ", time);
+		console::info("Demo reader reading message: %d \n", time);
 
 		int type;
 		stream.read(reinterpret_cast<char*>(&type), sizeof(type));
@@ -145,15 +159,18 @@ namespace demo_playback
 		}
 	}
 
+	std::mutex read_lock;
+
 	void demo_reader::read_frame(int ms)
 	{
+	
+		read_lock.lock();
 		time += ms;
 
-		int file_offset = stream.tellg();
-
-		for (int i = 0; i < 20; i++) {
+		while(true) {
 			int msg_time = peek_next_message_time();
 
+			console::info("Next message time: %d   currTime: %d \n", msg_time, time);
 			if (msg_time == 0xffffffff) {
 				read_message();
 				continue;
@@ -170,6 +187,8 @@ namespace demo_playback
 
 			read_message();
 		}
+
+		read_lock.unlock();
 	}
 
 	void demo_reader::close()
@@ -177,7 +196,23 @@ namespace demo_playback
 		stream.close();
 	}
 
+	void demo_reader::restart()
+	{
+		read_lock.lock();
+		stream.seekg(firstMessageFileOffset, std::ios_base::beg);
+		time = 0;
+		read_lock.unlock();
+	}
 
+	void demo_reader::jump_to(int target_time)
+	{
+		if (target_time < time) {
+			restart();
+		}
+
+		time = target_time;
+		read_frame(0);
+	}
 
 	std::optional<demo_reader> current_reader;
 
@@ -255,6 +290,32 @@ namespace demo_playback
 					}
 					else {
 						console::warn("Demo file does not exist: %s\n", filepath);
+					}
+				}
+			});
+
+			command::add("demo_restart", [](const command::params& params)
+			{
+				if (current_reader) {
+					current_reader->restart();
+				}
+			});
+
+			command::add("demo_jump_to", [](const command::params& params)
+			{
+				if (params.size() == 2) {
+					auto time = params.get(1);
+
+					int number;
+					auto [ptr, ec] = std::from_chars(time, time + strlen(time), number);
+					if (ec == std::errc{}) {
+						console::info("Jumping to demo time: %d", number);
+						if (current_reader) {
+							current_reader->jump_to(number);
+						}
+					}
+					else {
+						console::info("Failed to parse time\n");
 					}
 				}
 			});

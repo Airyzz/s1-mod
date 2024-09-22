@@ -67,9 +67,6 @@ namespace theater_camera
 	}
 
 	void r_update_lod_parms_stub(void* a1, void* a2, float a3) {
-		console::info("Updating lod parms: %llx, %llx, %f\n", a1, a2, a3);
-
-		//TODO: a1 points to refdef->tanHalfFovX, so we need to account for FOV here in the future
 
 		if (demo_playback::is_playing() && demo_camera_mode->current.integer == THEATER_CAMERA_FREECAM) {
 			game::refdef->origin[0] = freecam_pos[0];

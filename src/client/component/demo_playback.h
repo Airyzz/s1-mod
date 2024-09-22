@@ -11,6 +11,8 @@ namespace demo_playback
 		int time;
 		int firstMessageTime;
 		int offsetTime;
+		int firstMessageFileOffset;
+		int sequenceNumber;
 		std::ifstream stream;
 		std::string map;
 		std::string mode;
@@ -32,8 +34,11 @@ namespace demo_playback
 		std::string get_map_name();
 		std::string get_mode();
 
+
 		void read_frame(int ms);
 		void close();
+		void restart();
+		void jump_to(int time);
 	};
 
 	bool is_playing();
