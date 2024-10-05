@@ -32,9 +32,11 @@ namespace theater_camera
 	utils::hook::detour cg_calc_view_values_hook;
 	utils::hook::detour cl_renderscene_hook;
 	utils::hook::detour r_update_lod_parms_hook;
+	utils::hook::detour cg_cinematic_camera_get_fov_hook;
 
 	game::vec3_t freecam_pos;
 	game::vec4_t freecam_quat;
+	float freecam_fov = 90;
 
 	std::optional<std::vector<camera_keyframe_t>> dolly_frames;
 
@@ -147,9 +149,24 @@ namespace theater_camera
 		r_update_lod_parms_hook.invoke(a1, a2, a3);
 	}
 
-	void set_immediate_mode_camera_quat(game::vec4_t quat)
-	{
 
+	bool cg_is_cinematic_camera_active_stub(int clientNum) {
+		if (demo_playback::is_playing) {
+			if (theater_camera::get_current_mode() > THEATER_CAMERA_THIRD_PERSON) {
+				return true;
+			}
+		}
+
+		return 0;
+	}
+
+	bool cinematic_camera_check_stub() {
+		return 0;
+	}
+
+	float cg_cinematic_camera_get_fov_stub(int num, double result) {
+		console::info("getting fov: %llx  %f   ->   %f\n", num, result, freecam_fov);
+		return freecam_fov;
 	}
 
 	camera_mode get_current_mode()
@@ -166,6 +183,8 @@ namespace theater_camera
 		for (int i = 0; i < 4; i++) {
 			freecam_quat[i] = camera.quat[i];
 		}
+
+		freecam_fov = camera.fov;
 	}
 
 	void set_dolly_markers(std::vector<camera_keyframe_t> markers)
@@ -181,6 +200,13 @@ namespace theater_camera
 			bg_is_thirdperson_hook.create(0x14013C360, bg_is_thirdperson_stub);
 			cg_calc_view_values_hook.create(0x1401DC450, calc_view_values_stub);
 			r_update_lod_parms_hook.create(0x01405D3CA0, r_update_lod_parms_stub);
+
+			// Override cinematic camera check
+			utils::hook::call(0x1401D5CF9, cg_is_cinematic_camera_active_stub);
+			utils::hook::call(0x1401D5D04, cinematic_camera_check_stub);
+
+			cg_cinematic_camera_get_fov_hook.create(0x14001BC10, cg_cinematic_camera_get_fov_stub);
+
 			demo_camera_mode = game::Dvar_RegisterEnum("demo_camera", modes, 0, game::DVAR_FLAG_NONE, "");
 		}
 	};
