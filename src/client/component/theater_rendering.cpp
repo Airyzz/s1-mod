@@ -65,6 +65,9 @@ namespace theater_rendering
 		}
 	}
 
+	int data_validation_stub(int a1) {
+		return 0;
+	}
 	class component final : public component_interface
 	{
 	public:
@@ -74,6 +77,9 @@ namespace theater_rendering
 			cl_renderscene_hook.create(0x1401FD680, cl_render_scene_stub);
 			should_draw_post_fx_type_hook.create(0x1405FAE90, should_draw_post_fx_type_stub);
 			cg_draw_shellshock_blend_hook.create(0x1401D5420, cg_draw_shellshock_blend_stub);
+
+			// Disable dvar validation (allow external console to write memory to dvars)
+			utils::hook::call(0x1403B8DA8, data_validation_stub);
 
 			r_disable_boost_fx = game::Dvar_RegisterBool("r_disable_boost_fx", false, game::DVAR_FLAG_NONE, "Disable screen fx");
 
