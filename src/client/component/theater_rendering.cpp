@@ -35,7 +35,7 @@ namespace theater_rendering
 		uint64_t cg_draw_shellshock_blend_stub(uint64_t a1) {
 
 			if (demo_playback::is_playing()) {
-				if ( theater_camera::get_current_mode() != THEATER_CAMERA_FIRST_PERSON || r_disable_shellshock->current.enabled) {
+				if (theater_camera::get_current_mode() != THEATER_CAMERA_FIRST_PERSON || r_disable_shellshock->current.enabled) {
 					return 0;
 				}
 			}
@@ -72,7 +72,7 @@ namespace theater_rendering
 		{
 
 			cl_renderscene_hook.create(0x1401FD680, cl_render_scene_stub);
-			should_draw_post_fx_type_hook.create(0x1405FAE90, should_draw_post_fx_type_stub);
+			//should_draw_post_fx_type_hook.create(0x1405FAE90, should_draw_post_fx_type_stub);
 			cg_draw_shellshock_blend_hook.create(0x1401D5420, cg_draw_shellshock_blend_stub);
 
 			r_disable_boost_fx = game::Dvar_RegisterBool("r_disable_boost_fx", false, game::DVAR_FLAG_NONE, "Disable screen fx");

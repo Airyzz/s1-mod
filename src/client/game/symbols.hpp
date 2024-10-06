@@ -38,6 +38,9 @@ namespace game
 	WEAK symbol<void(int localClientNum, void (*)(int localClientNum))> Cbuf_AddCall{ 0x1402ED820, 0x1403AECF0 };
 	WEAK symbol<void(int localClientNum, const char* text)> Cbuf_AddText{ 0x1402ED890, 0x1403AED70 };
 	WEAK symbol<void(int localClientNum, int controllerIndex, const char* buffer, void(int, int, const char*))> Cbuf_ExecuteBufferInternal{ 0x1402ED9A0, 0x1403AEE80 };
+	WEAK symbol<void* (int index)> Com_GetClientDobj{ 0x0, 0x1403D2BA0 };
+	WEAK symbol<bool(void* dobj, scr_string_t name, uint8_t* outIndex)> DobjGetBoneIndex{ 0x0, 0x1404E1C00 };
+	WEAK symbol<bool(int localClientNum, int dobjIndex, int boneIndex, orientation_t* orient)> FX_GetBoneOrientation{ 0x0, 0x1402B1400 };
 
 	WEAK symbol<bool()> CL_IsCgameInitialized{ 0x140136560, 0x1401FD510 };
 	WEAK symbol<void(int localClientNum, const char* string)> CL_ForwardCommandToServer{ 0x0, 0x14020B310 };
@@ -46,6 +49,8 @@ namespace game
 
 	WEAK symbol<void(int localClientNum, const char* message)> CG_GameMessage{ 0x1400EE500, 0x1401A3050 };
 	WEAK symbol<void(int localClientNum, /*mp::cg_s**/void* cg, const char* dvar, const char* value)> CG_SetClientDvarFromServer{ 0, 0x1401BF0A0 };
+	WEAK symbol<int(int localClientNum, void* playerState, vec3_t* forward, vec3_t* right, vec3_t* up)> BG_GetPlayerViewDirection {0, 0x14013BF40};
+	WEAK symbol<bool(game::playerState_s* state)> BG_IsThirdPerson{ 0, 0x14013C360 };
 
 	WEAK symbol<void(XAssetType type, void (*func)(XAssetHeader, void*), void* inData, bool includeOverride)> DB_EnumXAssets_FastFile{ 0x14017D7C0, 0x14026EC10 };
 	WEAK symbol<void(XAssetType type, void(*func)(XAssetHeader, void*), const void* inData, bool includeOverride)> DB_EnumXAssets_Internal{ 0x14017D830, 0x14026EC80 };
