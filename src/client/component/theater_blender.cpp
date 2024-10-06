@@ -292,7 +292,7 @@ namespace theater_blender
 				return;
 			}
 
-			scheduler::loop(loop);
+			scheduler::loop(loop, scheduler::main);
 		}
 	};
 
