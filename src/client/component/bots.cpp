@@ -209,6 +209,24 @@ namespace bots
 			}
 		}
 
+		int sprintf_stub(char* dest, const char* format, ...) {
+			va_list args1;
+			va_start(args1, format);
+			va_list args2;
+			va_copy(args2, args1);
+
+			std::vector<char> str(std::vsnprintf(nullptr, 0, format, args1) + 1);
+			va_end(args1);
+
+			const int ret = std::vsnprintf(str.data(), str.size(), format, args2);
+			va_end(args2);
+
+			auto result = std::string(str.begin(), str.begin() + ret);
+			game::SV_Cmd_TokenizeString(result.c_str());
+		
+			return result.size();
+		}
+
 		int bot_format_customization_string(botoutfit_t* outfit, char* dst, int size) {
 			if (bot_outfits.empty()) {
 				return sprintf(dst, "%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|",
@@ -232,10 +250,28 @@ namespace bots
 
 			int character = (std::rand() % 15) + 1;
 			auto result = utils::string::replace(pick, "$random_character", std::to_string(character));
-			
-			int len = result.length();
-			memcpy(dst, result.data(), len);
 
+			if (result.length() >= size) {
+				console::warn("Bot outfit: '%s' was too large and would have overflowed, reverting to default\n", result.c_str());
+
+				return sprintf(dst, "%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|",
+					outfit->u1,
+					outfit->top,
+					outfit->head,
+					outfit->pants,
+					outfit->gloves,
+					outfit->boots,
+					outfit->kneeguards,
+					outfit->loadout,
+					outfit->helmet,
+					outfit->eyewear,
+					outfit->exo
+				);
+			}
+
+			int len = result.length();
+			
+			memcpy(dst, result.data(), len);
 			return len;
 		}
 	}
@@ -254,6 +290,10 @@ namespace bots
 
 			get_bot_name_hook.create(game::SV_BotGetRandomName, get_random_bot_name);
 			utils::hook::call(0x140439039, bot_format_customization_string);
+
+			// Fix stack overflow when sprintf buffer too small to hold bot config str
+			utils::hook::call(0x140439075, sprintf_stub);
+			utils::hook::nop(0x0140439081, 5);
 
 			command::add("spawnBot", [](const command::params& params)
 			{
