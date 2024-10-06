@@ -15,6 +15,13 @@ namespace game
 	typedef vec_t vec3_t[3];
 	typedef vec_t vec4_t[4];
 
+	struct orientation_t {
+		vec3_t origin;
+		vec3_t axis1;
+		vec3_t axis2;
+		vec3_t axis3;
+	};
+
 	// * scripting
 	enum scr_string_t
 	{

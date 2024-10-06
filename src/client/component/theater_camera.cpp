@@ -197,7 +197,7 @@ namespace theater_camera
 	public:
 		void post_unpack() override
 		{
-			bg_is_thirdperson_hook.create(0x14013C360, bg_is_thirdperson_stub);
+			bg_is_thirdperson_hook.create(game::BG_IsThirdPerson, bg_is_thirdperson_stub);
 			cg_calc_view_values_hook.create(0x1401DC450, calc_view_values_stub);
 			r_update_lod_parms_hook.create(0x01405D3CA0, r_update_lod_parms_stub);
 
