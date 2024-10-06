@@ -112,6 +112,7 @@ namespace game
 
 	bool is_headless()
 	{
+		return true;
 		static const auto headless = utils::flags::has_flag("headless");
 		return headless;
 	}

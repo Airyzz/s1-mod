@@ -7,6 +7,7 @@
 #include "dvars.hpp"
 #include "network.hpp"
 #include "party.hpp"
+#include "demonware.hpp"
 
 #include <utils/hook.hpp>
 #include <utils/string.hpp>
@@ -113,7 +114,8 @@ namespace network
 	{
 		sockaddr s = {};
 		game::NetadrToSockadr(a3, &s);
-		return sendto(*game::query_socket, src, size, 0, &s, 16) >= 0;
+
+		return demonware::io::sendto_stub(*game::query_socket, src, size, 0, &s, 16) >= 0;
 	}
 
 	void send(const game::netadr_s& address, const std::string& command, const std::string& data, const char separator)
@@ -177,7 +179,7 @@ namespace network
 	}
 
 	game::dvar_t* register_netport_stub(const char* dvarName, int value, int min, int max, unsigned int flags,
-	                                    const char* description)
+		const char* description)
 	{
 		auto dvar = game::Dvar_RegisterInt("net_port", 27016, 0, 0xFFFFu, game::DVAR_FLAG_LATCHED, "Network port");
 

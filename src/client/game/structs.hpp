@@ -3,6 +3,11 @@
 
 #define PROTOCOL 1
 
+#define STR_MERGE_IMPL(a, b) a##b
+#define STR_MERGE(a, b) STR_MERGE_IMPL(a, b)
+#define MAKE_PAD(size) STR_MERGE(_pad, __COUNTER__)[size]
+#define DEF_N(type, name, offset) struct {unsigned char MAKE_PAD(offset); type name;}
+
 namespace game
 {
 	typedef float vec_t;
@@ -1410,6 +1415,18 @@ namespace game
 
 	static_assert(sizeof(pml_t) == 0x130);
 
+	struct refdef_t {
+		unsigned char __pad0[0x10];
+		float tanHalfFovX;
+		float tanHalfFovY;
+		vec3_t origin;
+		float axis[9];
+		float __u1;
+		float __u2;
+		vec3_t viewOffset;
+		vec3_t viewOffsetPrev;
+	};
+
 	namespace mp
 	{
 		struct cachedSnapshot_t
@@ -1460,9 +1477,139 @@ namespace game
 
 		static_assert(sizeof(gentity_s) == 0x2E0);
 
-		struct playerState_s
-		{
+		struct MantleState {
+			float yaw;
+			int startPitch;
+			int index;
+			int flags;
+			int startTime;
+			vec3_t position;
 		};
+
+		struct SprintState {
+			int lastSprintStart;
+			int lastSprintEnd;
+			int sprintStartMaxLength;
+		};
+
+
+
+#pragma pack(push)
+#pragma pack(1)
+
+		struct usercmd_s {
+			int serverTime;
+			int buttons;
+			int angles_0;
+			int angles_1;
+			int angles_2;
+			int weapon;
+			int offhand;
+			char forwardMove;
+			char rightMove;
+			std::uint16_t airburstMarkDistance;
+			std::uint16_t meleeChargeEnt;
+			char meleeChargeDist;
+			char selectedLoc_1;
+			char selectedLoc_2;
+			char slectedLocAngle;
+			char removeControlAngles_1;
+			char removeControlAngles_2;
+			char removeControlMove_1;
+			char removeControlMove_2;
+			char removeControlMove_3;
+			char padding;
+			int sightedClientsMask;
+			std::uint16_t spawnTraceEntIndex;
+			std::uint16_t padding2;
+			int sightedSpawnsMask;
+			int partialSightedSpawnsMask;
+			int unknown;
+			int u2;
+		};
+
+		struct playerState_s {
+			int commandTime;
+			int pm_type;
+			int pm_time;
+			int pm_flags;
+			int otherflags;
+			int linkFlags;
+			int entity1;
+			int entity2;
+			int entity3;
+			int groundEntity;
+			int entity4;
+			int movingPlatformEnt;
+			char unknown[7 * 4];
+			int serverTime;
+			int jumpTimer;
+			char unknown2[2 * 4];
+			int viewState;
+			char unknown3[4 * 4];
+			int jumpTime;
+			float jumpOriginZ;
+			vec3_t origin;
+			vec3_t velocity;
+			vec3_t DeltaAngles;
+			vec3_t vLadderVec;
+			char unknown4[2 * 4];
+			int legsTimer;
+			int legsAnim;
+			int torsoTimer;
+			int torsoAnim;
+			int animMoveType;
+			int damageTimer;
+			int damageDuration;
+			float flinch;
+			int movementDirection;
+			int turnStartTime;
+			int turnDirection;
+			int turnRemaining;
+			char unknown5[53 * 4];
+			vec3_t viewAngles;
+			int unknown6;
+			int viewHeightTarget;
+			float viewHeightCurrent;
+			int viewHeightLerpTime;
+			int viewHeightLerpTarget;
+			char unknown7[9 * 4];
+			float proneDirection;
+			char unknown8[12 * 4];
+			int radarEnabled;
+			int radarBlocked;
+			int radarMove;
+			int radarStrength;
+			int radarShowEnemyDirection;
+			char unknown9[4 * 4];
+			SprintState sprintState;
+			int holdBreathScale;
+			int holdBreathTimer;
+			char unknown10[2 * 4];
+			int moveSpeedMultiplier;
+			int grenadeCookScale;
+			MantleState mantleState;
+			char unknown11[88 * 4];
+			int clientNum;
+			char data[0x5360];
+		};
+
+
+		union playerstate {
+			DEF_N(int, bobCycle, 0xe);
+			DEF_N(game::vec3_t, origin, 0x78);
+			DEF_N(game::vec3_t, deltaAngles, 0x90);
+			DEF_N(game::vec3_t, velocity, 0x84);
+			DEF_N(int, movementDir, 0xd0);
+			DEF_N(game::vec3_t, viewAngles, 0x1b4);
+		};
+
+		struct pmove_t {
+			playerState_s* playerState;
+			usercmd_s cmd;
+			usercmd_s oldcmd;
+		};
+#pragma pack(pop)
 
 		struct clientHeader_t
 		{
@@ -1488,6 +1635,15 @@ namespace game
 			TestClientType testClient; // 269600
 			char __pad5[391700];
 		}; // size = 661304
+
+		union clientActive_t {
+			DEF_N(game::vec3_t, cgameOrigin, 0x5228);
+			DEF_N(game::vec3_t, cgameVelocity, 0x5234);
+			DEF_N(int, cgameBobCycle , 0x52C0);
+			DEF_N(int, cgameMovementDir, 0x52c4);
+			DEF_N(int, cgamePredictedServerTime, 0x52CC);
+			DEF_N(game::vec3_t, cgameViewAngles, 0x52D0);
+		};
 	}
 
 	namespace sp
