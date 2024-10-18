@@ -30,6 +30,8 @@ namespace theater_camera
 {
 	camera_mode get_current_mode();
 
+	void get_current_position(game::vec3_t* position);
+
 	void set_camera_immediate_mode(camera_data_t camera);
 
 	void set_dolly_markers(std::vector<camera_keyframe_t> markers);

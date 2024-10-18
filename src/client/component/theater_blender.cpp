@@ -146,6 +146,7 @@ namespace theater_blender
 			auto cam = read_camera_data(&buffer);
 			if (demo_playback::is_playing()) {
 				if (theater_camera::get_current_mode() == THEATER_CAMERA_FREECAM) {
+					console::info("Setting immediate mode camera from blender\n");
 					theater_camera::set_camera_immediate_mode(cam);
 				}
 			}

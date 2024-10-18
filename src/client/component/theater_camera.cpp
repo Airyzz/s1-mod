@@ -98,6 +98,8 @@ namespace theater_camera
 
 		game::QuatLerp(&a.camera.quat[0], &b.camera.quat[0], alpha, &result.camera.quat[0]);
 
+		result.camera.fov = std::lerp(a.camera.fov, b.camera.fov, alpha);
+
 		return result;
 	}
 
@@ -172,6 +174,11 @@ namespace theater_camera
 	camera_mode get_current_mode()
 	{
 		return (camera_mode)demo_camera_mode->current.integer;
+	}
+
+	void get_current_position(game::vec3_t* position)
+	{
+		memcpy(position, &freecam_pos, sizeof(game::vec3_t));
 	}
 
 	void set_camera_immediate_mode(camera_data_t camera)

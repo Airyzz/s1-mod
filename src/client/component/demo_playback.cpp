@@ -275,6 +275,11 @@ namespace demo_playback
 		return result;
 	}
 
+	utils::hook::detour validate_data_hook;
+
+	bool validate_data_stub(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5) {
+		return 1;
+	}
 
 
 	class component final : public component_interface
@@ -350,6 +355,7 @@ namespace demo_playback
 
 			cg_draw_active_frame_hook.create(0x1401D4710, &cg_drawactiveframe_stub);
 			cl_get_predicted_player_information_for_server_time_hook.create(0x140210FF0, &cl_get_predicted_player_information_for_server_time_stub);
+			//validate_data_hook.create(0x140005B10, validate_data_stub);
 		}
 	};
 }

@@ -73,6 +73,7 @@ namespace game
 	WEAK symbol<void(const char* dvar, const char* buffer)> Dvar_SetCommand{ 0x1403730D0, 0x1404C2520 };
 	WEAK symbol<void(const dvar_t* dvar, const char* string)> Dvar_SetString{ 0x140373DE0, 0x1404C3610 };
 	WEAK symbol<void(const dvar_t* dvar, bool value)> Dvar_SetBool{ 0x0, 0x1404C1F30 };
+	WEAK symbol<void(const dvar_t* dvar, float value)> Dvar_SetFloat{ 0x0, 0x1404C2A10 };
 	WEAK symbol<void(const char*, const char*, DvarSetSource)> Dvar_SetFromStringByNameFromSource{ 0x1403737D0, 0x1404C2E40 };
 	WEAK symbol<const char* (dvar_t* dvar, dvar_value value)> Dvar_ValueToString{ 0x140374E10, 0x1404C47B0 };
 
